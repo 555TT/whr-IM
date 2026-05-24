@@ -93,7 +93,7 @@ func registerAndLoginHTTP(t *testing.T, baseURL string, username string) string 
 func makeFriendsHTTP(t *testing.T, baseURL string, aliceToken string, bobToken string) {
 	t.Helper()
 
-	requestBody := []byte(`{"toUserId":2,"message":"add me"}`)
+	requestBody := []byte(`{"toUsername":"bobby","message":"add me"}`)
 	requestReq, _ := http.NewRequest(http.MethodPost, baseURL+"/api/friend-requests", bytes.NewReader(requestBody))
 	requestReq.Header.Set("Content-Type", "application/json")
 	requestReq.Header.Set("Authorization", "Bearer "+aliceToken)

@@ -14,7 +14,7 @@ func TestFriendRequestAcceptAndFriendsListFlow(t *testing.T) {
 	aliceToken := registerAndLogin(t, r, "alice")
 	bobToken := registerAndLogin(t, r, "bobby")
 
-	requestBody := []byte(`{"toUserId":2,"message":"add me"}`)
+	requestBody := []byte(`{"toUsername":"bobby","message":"add me"}`)
 	requestReq := httptest.NewRequest(http.MethodPost, "/api/friend-requests", bytes.NewReader(requestBody))
 	requestReq.Header.Set("Content-Type", "application/json")
 	requestReq.Header.Set("Authorization", "Bearer "+aliceToken)
@@ -93,7 +93,7 @@ func TestFriendRequestCanBeRejected(t *testing.T) {
 	aliceToken := registerAndLogin(t, r, "alice")
 	bobToken := registerAndLogin(t, r, "bobby")
 
-	requestBody := []byte(`{"toUserId":2,"message":"add me"}`)
+	requestBody := []byte(`{"toUsername":"bobby","message":"add me"}`)
 	requestReq := httptest.NewRequest(http.MethodPost, "/api/friend-requests", bytes.NewReader(requestBody))
 	requestReq.Header.Set("Content-Type", "application/json")
 	requestReq.Header.Set("Authorization", "Bearer "+aliceToken)

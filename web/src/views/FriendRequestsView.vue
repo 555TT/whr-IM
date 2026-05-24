@@ -13,7 +13,7 @@ interface FriendRequestItem {
 }
 
 const requests = ref<FriendRequestItem[]>([])
-const toUserId = ref<number | null>(null)
+const toUsername = ref('')
 const note = ref('')
 const feedback = ref('')
 const errorMessage = ref('')
@@ -24,13 +24,13 @@ async function loadRequests() {
 }
 
 async function sendRequest() {
-  if (!toUserId.value) return
+  if (!toUsername.value.trim()) return
   feedback.value = ''
   errorMessage.value = ''
   try {
-    await http.post('/friend-requests', { toUserId: toUserId.value, message: note.value })
+    await http.post('/friend-requests', { toUsername: toUsername.value.trim(), message: note.value })
     feedback.value = '申请已发送'
-    toUserId.value = null
+    toUsername.value = ''
     note.value = ''
   } catch (error) {
     errorMessage.value = (error as Error).message
@@ -71,10 +71,10 @@ onMounted(loadRequests)
       <div class="card apple-panel request-form-card">
         <p class="apple-label">Add friend</p>
         <h1>发起好友申请</h1>
-        <p class="muted">输入目标用户 ID，并附上一句简短说明。</p>
+        <p class="muted">输入目标用户名，并附上一句简短说明。</p>
         <p v-if="feedback" class="status-text success">{{ feedback }}</p>
         <p v-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
-        <input v-model.number="toUserId" class="apple-input" type="number" placeholder="目标用户 ID" />
+        <input v-model="toUsername" class="apple-input" placeholder="目标用户名" />
         <input v-model="note" class="apple-input" placeholder="申请附言" />
         <button class="apple-button" @click="sendRequest">发送申请</button>
       </div>

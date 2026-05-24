@@ -17,8 +17,8 @@ func NewFriendService(friendRepo repository.FriendRepository, userRepo repositor
 }
 
 type CreateFriendRequestInput struct {
-	ToUserID uint64
-	Message  string
+	ToUsername string
+	Message    string
 }
 
 type FriendListItem struct {
@@ -30,13 +30,14 @@ type FriendListItem struct {
 }
 
 func (s *FriendService) CreateRequest(fromUserID uint64, input CreateFriendRequestInput) (*model.FriendRequest, error) {
-	if fromUserID == input.ToUserID {
-		return nil, fmt.Errorf("cannot add yourself")
-	}
-	if _, err := s.userRepo.FindByID(input.ToUserID); err != nil {
+	targetUser, err := s.userRepo.FindByUsername(input.ToUsername)
+	if err != nil {
 		return nil, err
 	}
-	request := &model.FriendRequest{FromUserID: fromUserID, ToUserID: input.ToUserID, Message: input.Message, Status: "pending"}
+	if fromUserID == targetUser.ID {
+		return nil, fmt.Errorf("cannot add yourself")
+	}
+	request := &model.FriendRequest{FromUserID: fromUserID, ToUserID: targetUser.ID, Message: input.Message, Status: "pending"}
 	if err := s.friendRepo.CreateRequest(request); err != nil {
 		return nil, err
 	}

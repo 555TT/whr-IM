@@ -48,6 +48,7 @@ func NewWithUserRepository(userRepo repository.UserRepository) *gin.Engine {
 
 func NewWithRepositories(userRepo repository.UserRepository, friendRepo repository.FriendRepository, messageRepo repository.MessageRepository) *gin.Engine {
 	r := gin.Default()
+	r.Use(middleware.CORS())
 	r.GET("/health", handler.Health)
 
 	hub := ws.NewHub()

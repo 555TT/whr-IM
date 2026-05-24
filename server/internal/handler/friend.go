@@ -19,8 +19,8 @@ func NewFriendHandler(friendService *service.FriendService) *FriendHandler {
 }
 
 type createFriendRequest struct {
-	ToUserID uint64  `json:"toUserId"`
-	Message  string `json:"message"`
+	ToUsername string `json:"toUsername"`
+	Message    string `json:"message"`
 }
 
 func (h *FriendHandler) CreateRequest(c *gin.Context) {
@@ -29,7 +29,7 @@ func (h *FriendHandler) CreateRequest(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid request"})
 		return
 	}
-	request, err := h.friendService.CreateRequest(c.MustGet("userID").(uint64), service.CreateFriendRequestInput{ToUserID: req.ToUserID, Message: req.Message})
+	request, err := h.friendService.CreateRequest(c.MustGet("userID").(uint64), service.CreateFriendRequestInput{ToUsername: req.ToUsername, Message: req.Message})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return

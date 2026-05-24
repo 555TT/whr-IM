@@ -2,7 +2,7 @@ import { onMounted, ref } from 'vue';
 import AppNav from '../components/AppNav.vue';
 import { http } from '../api/http';
 const requests = ref([]);
-const toUserId = ref(null);
+const toUsername = ref('');
 const note = ref('');
 const feedback = ref('');
 const errorMessage = ref('');
@@ -11,14 +11,14 @@ async function loadRequests() {
     requests.value = data.filter((item) => item.status === 'pending');
 }
 async function sendRequest() {
-    if (!toUserId.value)
+    if (!toUsername.value.trim())
         return;
     feedback.value = '';
     errorMessage.value = '';
     try {
-        await http.post('/friend-requests', { toUserId: toUserId.value, message: note.value });
+        await http.post('/friend-requests', { toUsername: toUsername.value.trim(), message: note.value });
         feedback.value = '申请已发送';
-        toUserId.value = null;
+        toUsername.value = '';
         note.value = '';
     }
     catch (error) {
@@ -94,10 +94,9 @@ if (__VLS_ctx.errorMessage) {
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     ...{ class: "apple-input" },
-    type: "number",
-    placeholder: "目标用户 ID",
+    placeholder: "目标用户名",
 });
-(__VLS_ctx.toUserId);
+(__VLS_ctx.toUsername);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     ...{ class: "apple-input" },
     placeholder: "申请附言",
@@ -185,7 +184,7 @@ const __VLS_self = (await import('vue')).defineComponent({
         return {
             AppNav: AppNav,
             requests: requests,
-            toUserId: toUserId,
+            toUsername: toUsername,
             note: note,
             feedback: feedback,
             errorMessage: errorMessage,

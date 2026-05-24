@@ -63,7 +63,7 @@ func createMessage(t *testing.T, r http.Handler, token string, body string) {
 func makeFriends(t *testing.T, r http.Handler, aliceToken string, bobToken string) {
 	t.Helper()
 
-	requestBody := []byte(`{"toUserId":2,"message":"add me"}`)
+	requestBody := []byte(`{"toUsername":"bobby","message":"add me"}`)
 	requestReq := httptest.NewRequest(http.MethodPost, "/api/friend-requests", bytes.NewReader(requestBody))
 	requestReq.Header.Set("Content-Type", "application/json")
 	requestReq.Header.Set("Authorization", "Bearer "+aliceToken)
