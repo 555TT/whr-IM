@@ -16,6 +16,11 @@ const defaultAvatar = "https://api.dicebear.com/7.x/initials/svg?seed=default-us
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
 
+const minUsernameLength = 4
+const maxUsernameLength = 20
+const minPasswordLength = 6
+const maxPasswordLength = 20
+
 type AuthService struct {
 	repo      repository.UserRepository
 	jwtSecret []byte
@@ -38,6 +43,9 @@ type UpdateProfileInput struct {
 }
 
 func (s *AuthService) Register(input RegisterInput) (*model.User, error) {
+	if err := validateCredentials(input.Username, input.Password); err != nil {
+		return nil, err
+	}
 	if input.Password != input.ConfirmPassword {
 		return nil, fmt.Errorf("passwords do not match")
 	}
@@ -63,6 +71,10 @@ func (s *AuthService) Register(input RegisterInput) (*model.User, error) {
 }
 
 func (s *AuthService) Login(username, password string) (string, *model.User, error) {
+	if err := validateCredentials(username, password); err != nil {
+		return "", nil, err
+	}
+
 	user, err := s.repo.FindByUsername(username)
 	if err != nil {
 		return "", nil, ErrInvalidCredentials
@@ -112,4 +124,14 @@ func (s *AuthService) GetProfile(userID uint64) (*model.User, error) {
 
 func (s *AuthService) UpdateProfile(userID uint64, input UpdateProfileInput) (*model.User, error) {
 	return s.repo.UpdateProfile(userID, input.Nickname, input.Gender, input.Signature)
+}
+
+func validateCredentials(username, password string) error {
+	if len(username) < minUsernameLength || len(username) > maxUsernameLength {
+		return fmt.Errorf("username length must be between 4 and 20")
+	}
+	if len(password) < minPasswordLength || len(password) > maxPasswordLength {
+		return fmt.Errorf("password length must be between 6 and 20")
+	}
+	return nil
 }

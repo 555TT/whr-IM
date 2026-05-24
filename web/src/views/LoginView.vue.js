@@ -14,8 +14,19 @@ const form = reactive({
 watch(() => route.query.username, (value) => {
     form.username = typeof value === 'string' ? value : '';
 });
+function validate() {
+    if (form.username.length < 4 || form.username.length > 20) {
+        return '用户名长度需在 4 到 20 位之间';
+    }
+    if (form.password.length < 6 || form.password.length > 20) {
+        return '密码长度需在 6 到 20 位之间';
+    }
+    return '';
+}
 async function login() {
-    errorMessage.value = '';
+    errorMessage.value = validate();
+    if (errorMessage.value)
+        return;
     loading.value = true;
     try {
         const { data } = await http.post('/auth/login', {
@@ -78,13 +89,13 @@ if (__VLS_ctx.errorMessage) {
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     ...{ class: "apple-input" },
-    placeholder: "用户名",
+    placeholder: "用户名（4-20 位）",
 });
 (__VLS_ctx.form.username);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     ...{ class: "apple-input" },
     type: "password",
-    placeholder: "密码",
+    placeholder: "密码（6-20 位）",
 });
 (__VLS_ctx.form.password);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({

@@ -12,7 +12,7 @@ func TestFriendRequestAcceptAndFriendsListFlow(t *testing.T) {
 	r := newTestRouter(t)
 
 	aliceToken := registerAndLogin(t, r, "alice")
-	bobToken := registerAndLogin(t, r, "bob")
+	bobToken := registerAndLogin(t, r, "bobby")
 
 	requestBody := []byte(`{"toUserId":2,"message":"add me"}`)
 	requestReq := httptest.NewRequest(http.MethodPost, "/api/friend-requests", bytes.NewReader(requestBody))
@@ -91,7 +91,7 @@ func TestFriendRequestCanBeRejected(t *testing.T) {
 	r := newTestRouter(t)
 
 	aliceToken := registerAndLogin(t, r, "alice")
-	bobToken := registerAndLogin(t, r, "bob")
+	bobToken := registerAndLogin(t, r, "bobby")
 
 	requestBody := []byte(`{"toUserId":2,"message":"add me"}`)
 	requestReq := httptest.NewRequest(http.MethodPost, "/api/friend-requests", bytes.NewReader(requestBody))

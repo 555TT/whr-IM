@@ -23,8 +23,19 @@ watch(
   }
 )
 
+function validate() {
+  if (form.username.length < 4 || form.username.length > 20) {
+    return '用户名长度需在 4 到 20 位之间'
+  }
+  if (form.password.length < 6 || form.password.length > 20) {
+    return '密码长度需在 6 到 20 位之间'
+  }
+  return ''
+}
+
 async function login() {
-  errorMessage.value = ''
+  errorMessage.value = validate()
+  if (errorMessage.value) return
   loading.value = true
   try {
     const { data } = await http.post('/auth/login', {
@@ -57,8 +68,8 @@ async function login() {
           <p class="muted">使用你的账号继续进入聊天空间。</p>
         </div>
         <p v-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
-        <input v-model="form.username" class="apple-input" placeholder="用户名" />
-        <input v-model="form.password" class="apple-input" type="password" placeholder="密码" />
+        <input v-model="form.username" class="apple-input" placeholder="用户名（4-20 位）" />
+        <input v-model="form.password" class="apple-input" type="password" placeholder="密码（6-20 位）" />
         <button class="apple-button" :disabled="loading" @click="login">登录</button>
         <p class="switch-text muted">
           还没有账号？

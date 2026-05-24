@@ -12,7 +12,7 @@ func TestMessageHistoryReturnsConversationInTimeOrder(t *testing.T) {
 	r := newTestRouter(t)
 
 	aliceToken := registerAndLogin(t, r, "alice")
-	bobToken := registerAndLogin(t, r, "bob")
+	bobToken := registerAndLogin(t, r, "bobby")
 	makeFriends(t, r, aliceToken, bobToken)
 
 	createMessage(t, r, aliceToken, `{"receiverId":2,"content":"hello bob"}`)

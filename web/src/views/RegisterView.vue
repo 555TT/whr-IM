@@ -15,9 +15,27 @@ const form = reactive({
   confirmPassword: ''
 })
 
+function validate() {
+  if (form.username.length < 4 || form.username.length > 20) {
+    return '用户名长度需在 4 到 20 位之间'
+  }
+  if (form.password.length < 6 || form.password.length > 20) {
+    return '密码长度需在 6 到 20 位之间'
+  }
+  if (form.password !== form.confirmPassword) {
+    return '两次输入的密码不一致'
+  }
+  return ''
+}
+
 async function register() {
   errorMessage.value = ''
   successMessage.value = ''
+  const validationMessage = validate()
+  if (validationMessage) {
+    errorMessage.value = validationMessage
+    return
+  }
   loading.value = true
   try {
     const { data } = await http.post('/auth/register', form)
@@ -54,8 +72,8 @@ async function register() {
         </div>
         <p v-if="successMessage" class="status-text success">{{ successMessage }}</p>
         <p v-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
-        <input v-model="form.username" class="apple-input" placeholder="用户名" />
-        <input v-model="form.password" class="apple-input" type="password" placeholder="密码" />
+        <input v-model="form.username" class="apple-input" placeholder="用户名（4-20 位）" />
+        <input v-model="form.password" class="apple-input" type="password" placeholder="密码（6-20 位）" />
         <input v-model="form.confirmPassword" class="apple-input" type="password" placeholder="确认密码" />
         <button class="apple-button" :disabled="loading" @click="register">注册账号</button>
         <p class="switch-text muted">

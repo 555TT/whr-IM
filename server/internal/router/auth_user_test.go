@@ -153,6 +153,62 @@ func TestRegisterRejectsDuplicateUsername(t *testing.T) {
 	}
 }
 
+func TestRegisterRejectsInvalidUsernameAndPasswordLength(t *testing.T) {
+	r := newTestRouter(t)
+
+	shortUsernameBody := []byte(`{"username":"abc","password":"secret123","confirmPassword":"secret123"}`)
+	shortUsernameReq := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(shortUsernameBody))
+	shortUsernameReq.Header.Set("Content-Type", "application/json")
+	shortUsernameW := httptest.NewRecorder()
+	r.ServeHTTP(shortUsernameW, shortUsernameReq)
+	if shortUsernameW.Code != http.StatusBadRequest {
+		t.Fatalf("expected short username status 400, got %d with body %s", shortUsernameW.Code, shortUsernameW.Body.String())
+	}
+	if !bytes.Contains(shortUsernameW.Body.Bytes(), []byte("username length must be between 4 and 20")) {
+		t.Fatalf("expected username length error, got %s", shortUsernameW.Body.String())
+	}
+
+	shortPasswordBody := []byte(`{"username":"validuser","password":"12345","confirmPassword":"12345"}`)
+	shortPasswordReq := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(shortPasswordBody))
+	shortPasswordReq.Header.Set("Content-Type", "application/json")
+	shortPasswordW := httptest.NewRecorder()
+	r.ServeHTTP(shortPasswordW, shortPasswordReq)
+	if shortPasswordW.Code != http.StatusBadRequest {
+		t.Fatalf("expected short password status 400, got %d with body %s", shortPasswordW.Code, shortPasswordW.Body.String())
+	}
+	if !bytes.Contains(shortPasswordW.Body.Bytes(), []byte("password length must be between 6 and 20")) {
+		t.Fatalf("expected password length error, got %s", shortPasswordW.Body.String())
+	}
+}
+
+func TestLoginRejectsInvalidUsernameAndPasswordLength(t *testing.T) {
+	r := newTestRouter(t)
+
+	shortUsernameBody := []byte(`{"username":"abc","password":"secret123"}`)
+	shortUsernameReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(shortUsernameBody))
+	shortUsernameReq.Header.Set("Content-Type", "application/json")
+	shortUsernameW := httptest.NewRecorder()
+	r.ServeHTTP(shortUsernameW, shortUsernameReq)
+	if shortUsernameW.Code != http.StatusBadRequest {
+		t.Fatalf("expected short username login status 400, got %d with body %s", shortUsernameW.Code, shortUsernameW.Body.String())
+	}
+	if !bytes.Contains(shortUsernameW.Body.Bytes(), []byte("username length must be between 4 and 20")) {
+		t.Fatalf("expected username length error, got %s", shortUsernameW.Body.String())
+	}
+
+	shortPasswordBody := []byte(`{"username":"validuser","password":"12345"}`)
+	shortPasswordReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(shortPasswordBody))
+	shortPasswordReq.Header.Set("Content-Type", "application/json")
+	shortPasswordW := httptest.NewRecorder()
+	r.ServeHTTP(shortPasswordW, shortPasswordReq)
+	if shortPasswordW.Code != http.StatusBadRequest {
+		t.Fatalf("expected short password login status 400, got %d with body %s", shortPasswordW.Code, shortPasswordW.Body.String())
+	}
+	if !bytes.Contains(shortPasswordW.Body.Bytes(), []byte("password length must be between 6 and 20")) {
+		t.Fatalf("expected password length error, got %s", shortPasswordW.Body.String())
+	}
+}
+
 func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 

@@ -18,7 +18,7 @@ func TestWebSocketDeliversChatMessageToOnlineFriend(t *testing.T) {
 	defer server.Close()
 
 	aliceToken := registerAndLoginHTTP(t, server.URL, "alice")
-	bobToken := registerAndLoginHTTP(t, server.URL, "bob")
+	bobToken := registerAndLoginHTTP(t, server.URL, "bobby")
 	makeFriendsHTTP(t, server.URL, aliceToken, bobToken)
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws?token=" + bobToken
