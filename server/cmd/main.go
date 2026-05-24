@@ -3,12 +3,18 @@ package main
 import (
 	"log"
 
+	"whr-im/server/internal/config"
 	"whr-im/server/internal/router"
 )
 
 func main() {
-	r := router.New()
-	if err := r.Run(":8080"); err != nil {
+	cfg, err := config.Load("config/config.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	r := router.New(cfg)
+	if err := r.Run(cfg.Server.Port); err != nil {
 		log.Fatal(err)
 	}
 }

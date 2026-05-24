@@ -1,0 +1,4 @@
+server:
+  port: ":8080"
+mysql:
+  dsn: "root:easy-chat@tcp(192.168.18.66:13306)/whr_im?charset=utf8mb4&parseTime=True&loc=Local"

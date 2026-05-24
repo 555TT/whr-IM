@@ -2,8 +2,8 @@ package router
 
 import (
 	"log"
-	"os"
 
+	"whr-im/server/internal/config"
 	"whr-im/server/internal/handler"
 	"whr-im/server/internal/middleware"
 	"whr-im/server/internal/repository"
@@ -15,10 +15,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func New() *gin.Engine {
-	dsn := os.Getenv("MYSQL_DSN")
+func New(cfg *config.Config) *gin.Engine {
+	dsn := cfg.MySQL.DSN
 	if dsn == "" {
-		log.Fatal("MYSQL_DSN is required")
+		log.Fatal("mysql dsn is required")
 	}
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
