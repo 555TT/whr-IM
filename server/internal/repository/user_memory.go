@@ -15,6 +15,7 @@ type UserRepository interface {
 	FindByUsername(username string) (*model.User, error)
 	FindByID(id uint64) (*model.User, error)
 	UpdateProfile(userID uint64, nickname string, gender int, signature string) (*model.User, error)
+	UpdatePublicKey(userID uint64, publicKey string, algorithm string) (*model.User, error)
 }
 
 type InMemoryUserRepository struct {
@@ -88,6 +89,22 @@ func (r *InMemoryUserRepository) UpdateProfile(userID uint64, nickname string, g
 	user.Nickname = nickname
 	user.Gender = gender
 	user.Signature = signature
+
+	copyUser := *user
+	return &copyUser, nil
+}
+
+func (r *InMemoryUserRepository) UpdatePublicKey(userID uint64, publicKey string, algorithm string) (*model.User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	user, ok := r.users[userID]
+	if !ok {
+		return nil, ErrUserNotFound
+	}
+
+	user.PublicKey = publicKey
+	user.PublicKeyAlgorithm = algorithm
 
 	copyUser := *user
 	return &copyUser, nil

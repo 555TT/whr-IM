@@ -6,8 +6,8 @@ type Message struct {
 	ID         uint64    `gorm:"primaryKey" json:"id"`
 	SenderID   uint64    `gorm:"not null;index" json:"senderId"`
 	ReceiverID uint64    `gorm:"not null;index" json:"receiverId"`
-	Content    string    `gorm:"type:text;not null" json:"content"`
-	MsgType    string    `gorm:"size:20;not null;default:text" json:"msgType"`
+	Ciphertext string    `gorm:"type:text;not null" json:"ciphertext"`
+	Algorithm  string    `gorm:"size:50;not null" json:"algorithm"`
 	CreatedAt  time.Time `json:"createdAt"`
 }
 

@@ -29,10 +29,12 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 
 	var registerResp struct {
 		User struct {
-			ID       uint64  `json:"id"`
-			Username string `json:"username"`
-			Nickname string `json:"nickname"`
-			Avatar   string `json:"avatar"`
+			ID                 uint64 `json:"id"`
+			Username           string `json:"username"`
+			Nickname           string `json:"nickname"`
+			Avatar             string `json:"avatar"`
+			PublicKey          string `json:"publicKey"`
+			PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
 		} `json:"user"`
 	}
 	if err := json.Unmarshal(registerW.Body.Bytes(), &registerResp); err != nil {
@@ -47,6 +49,12 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	}
 	if registerResp.User.Avatar == "" {
 		t.Fatal("expected default avatar to be assigned")
+	}
+	if registerResp.User.PublicKey != "" {
+		t.Fatalf("expected empty publicKey on register, got %q", registerResp.User.PublicKey)
+	}
+	if registerResp.User.PublicKeyAlgorithm != "" {
+		t.Fatalf("expected empty publicKeyAlgorithm on register, got %q", registerResp.User.PublicKeyAlgorithm)
 	}
 
 	loginBody := []byte(`{"username":"alice","password":"secret123"}`)
@@ -63,7 +71,9 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	var loginResp struct {
 		Token string `json:"token"`
 		User  struct {
-			Username string `json:"username"`
+			Username           string `json:"username"`
+			PublicKey          string `json:"publicKey"`
+			PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
 		} `json:"user"`
 	}
 	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
@@ -71,6 +81,12 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	}
 	if loginResp.Token == "" {
 		t.Fatal("expected jwt token to be returned")
+	}
+	if loginResp.User.PublicKey != "" {
+		t.Fatalf("expected empty publicKey on login, got %q", loginResp.User.PublicKey)
+	}
+	if loginResp.User.PublicKeyAlgorithm != "" {
+		t.Fatalf("expected empty publicKeyAlgorithm on login, got %q", loginResp.User.PublicKeyAlgorithm)
 	}
 
 	meReq := httptest.NewRequest(http.MethodGet, "/api/users/me", nil)
@@ -84,16 +100,24 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	}
 
 	var meResp struct {
-		Username  string `json:"username"`
-		Nickname  string `json:"nickname"`
-		Avatar    string `json:"avatar"`
-		Signature string `json:"signature"`
+		Username           string `json:"username"`
+		Nickname           string `json:"nickname"`
+		Avatar             string `json:"avatar"`
+		Signature          string `json:"signature"`
+		PublicKey          string `json:"publicKey"`
+		PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
 	}
 	if err := json.Unmarshal(meW.Body.Bytes(), &meResp); err != nil {
 		t.Fatalf("expected valid me response json, got error: %v", err)
 	}
 	if meResp.Username != "alice" {
 		t.Fatalf("expected me username alice, got %q", meResp.Username)
+	}
+	if meResp.PublicKey != "" {
+		t.Fatalf("expected empty publicKey in profile, got %q", meResp.PublicKey)
+	}
+	if meResp.PublicKeyAlgorithm != "" {
+		t.Fatalf("expected empty publicKeyAlgorithm in profile, got %q", meResp.PublicKeyAlgorithm)
 	}
 
 	updateFemaleBody := []byte(`{"nickname":"Alice","gender":0,"signature":"hello im"}`)
@@ -109,10 +133,12 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	}
 
 	var updateFemaleResp struct {
-		Nickname  string `json:"nickname"`
-		Gender    int    `json:"gender"`
-		Signature string `json:"signature"`
-		Avatar    string `json:"avatar"`
+		Nickname           string `json:"nickname"`
+		Gender             int    `json:"gender"`
+		Signature          string `json:"signature"`
+		Avatar             string `json:"avatar"`
+		PublicKey          string `json:"publicKey"`
+		PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
 	}
 	if err := json.Unmarshal(updateFemaleW.Body.Bytes(), &updateFemaleResp); err != nil {
 		t.Fatalf("expected valid female update response json, got error: %v", err)
@@ -129,6 +155,12 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	if updateFemaleResp.Avatar == "" {
 		t.Fatal("expected avatar to remain populated")
 	}
+	if updateFemaleResp.PublicKey != "" {
+		t.Fatalf("expected publicKey to remain empty after profile update, got %q", updateFemaleResp.PublicKey)
+	}
+	if updateFemaleResp.PublicKeyAlgorithm != "" {
+		t.Fatalf("expected publicKeyAlgorithm to remain empty after profile update, got %q", updateFemaleResp.PublicKeyAlgorithm)
+	}
 
 	updateMaleBody := []byte(`{"nickname":"Alice","gender":1,"signature":"hello im"}`)
 	updateMaleReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader(updateMaleBody))
@@ -143,7 +175,9 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	}
 
 	var updateMaleResp struct {
-		Gender int `json:"gender"`
+		Gender             int    `json:"gender"`
+		PublicKey          string `json:"publicKey"`
+		PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
 	}
 	if err := json.Unmarshal(updateMaleW.Body.Bytes(), &updateMaleResp); err != nil {
 		t.Fatalf("expected valid male update response json, got error: %v", err)
@@ -151,6 +185,104 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	if updateMaleResp.Gender != 1 {
 		t.Fatalf("expected updated gender 1 for male, got %d", updateMaleResp.Gender)
 	}
+	if updateMaleResp.PublicKey != "" {
+		t.Fatalf("expected publicKey to remain empty after second profile update, got %q", updateMaleResp.PublicKey)
+	}
+	if updateMaleResp.PublicKeyAlgorithm != "" {
+		t.Fatalf("expected publicKeyAlgorithm to remain empty after second profile update, got %q", updateMaleResp.PublicKeyAlgorithm)
+	}
+}
+
+func TestUserCanUpdateOwnPublicKey(t *testing.T) {
+	r := newTestRouter(t)
+	token := registerAndLogin(t, r, "alice")
+
+	updateBody := []byte(`{"publicKey":"alice-public-key","algorithm":"rsa-oaep-sha256"}`)
+	updateReq := httptest.NewRequest(http.MethodPut, "/api/users/me/public-key", bytes.NewReader(updateBody))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("Authorization", "Bearer "+token)
+	updateW := httptest.NewRecorder()
+
+	r.ServeHTTP(updateW, updateReq)
+
+	if updateW.Code != http.StatusOK {
+		t.Fatalf("expected public key update status 200, got %d with body %s", updateW.Code, updateW.Body.String())
+	}
+
+	var updateResp struct {
+		PublicKey          string `json:"publicKey"`
+		PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
+	}
+	if err := json.Unmarshal(updateW.Body.Bytes(), &updateResp); err != nil {
+		t.Fatalf("expected valid public key update response json, got error: %v", err)
+	}
+	if updateResp.PublicKey != "alice-public-key" {
+		t.Fatalf("expected updated publicKey, got %q", updateResp.PublicKey)
+	}
+	if updateResp.PublicKeyAlgorithm != "rsa-oaep-sha256" {
+		t.Fatalf("expected updated publicKeyAlgorithm rsa-oaep-sha256, got %q", updateResp.PublicKeyAlgorithm)
+	}
+}
+
+func TestUserCannotUpdatePublicKeyWithInvalidPayload(t *testing.T) {
+	r := newTestRouter(t)
+	token := registerAndLogin(t, r, "bobby")
+
+	t.Run("empty public key returns 400", func(t *testing.T) {
+		updateBody := []byte(`{"publicKey":"","algorithm":"rsa-oaep-sha256"}`)
+		updateReq := httptest.NewRequest(http.MethodPut, "/api/users/me/public-key", bytes.NewReader(updateBody))
+		updateReq.Header.Set("Content-Type", "application/json")
+		updateReq.Header.Set("Authorization", "Bearer "+token)
+		updateW := httptest.NewRecorder()
+
+		r.ServeHTTP(updateW, updateReq)
+
+		if updateW.Code != http.StatusBadRequest {
+			t.Fatalf("expected status 400 for empty publicKey, got %d with body %s", updateW.Code, updateW.Body.String())
+		}
+	})
+
+	t.Run("empty algorithm returns 400", func(t *testing.T) {
+		updateBody := []byte(`{"publicKey":"bob-public-key","algorithm":""}`)
+		updateReq := httptest.NewRequest(http.MethodPut, "/api/users/me/public-key", bytes.NewReader(updateBody))
+		updateReq.Header.Set("Content-Type", "application/json")
+		updateReq.Header.Set("Authorization", "Bearer "+token)
+		updateW := httptest.NewRecorder()
+
+		r.ServeHTTP(updateW, updateReq)
+
+		if updateW.Code != http.StatusBadRequest {
+			t.Fatalf("expected status 400 for empty algorithm, got %d with body %s", updateW.Code, updateW.Body.String())
+		}
+	})
+
+	t.Run("unsupported algorithm returns 400", func(t *testing.T) {
+		updateBody := []byte(`{"publicKey":"bob-public-key","algorithm":"x25519"}`)
+		updateReq := httptest.NewRequest(http.MethodPut, "/api/users/me/public-key", bytes.NewReader(updateBody))
+		updateReq.Header.Set("Content-Type", "application/json")
+		updateReq.Header.Set("Authorization", "Bearer "+token)
+		updateW := httptest.NewRecorder()
+
+		r.ServeHTTP(updateW, updateReq)
+
+		if updateW.Code != http.StatusBadRequest {
+			t.Fatalf("expected status 400 for unsupported algorithm, got %d with body %s", updateW.Code, updateW.Body.String())
+		}
+	})
+
+	t.Run("invalid json body returns 400", func(t *testing.T) {
+		updateBody := []byte(`not-json`)
+		updateReq := httptest.NewRequest(http.MethodPut, "/api/users/me/public-key", bytes.NewReader(updateBody))
+		updateReq.Header.Set("Content-Type", "application/json")
+		updateReq.Header.Set("Authorization", "Bearer "+token)
+		updateW := httptest.NewRecorder()
+
+		r.ServeHTTP(updateW, updateReq)
+
+		if updateW.Code != http.StatusBadRequest {
+			t.Fatalf("expected status 400 for invalid JSON, got %d with body %s", updateW.Code, updateW.Body.String())
+		}
+	})
 }
 
 func TestRegisterRejectsDuplicateUsername(t *testing.T) {

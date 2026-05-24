@@ -28,7 +28,7 @@ func TestWebSocketDeliversChatMessageToOnlineFriend(t *testing.T) {
 	}
 	defer bobConn.Close()
 
-	createMessageHTTP(t, server.URL, aliceToken, `{"receiverId":2,"content":"hello ws"}`)
+	createMessageHTTP(t, server.URL, aliceToken, `{"receiverId":2,"ciphertext":"hello ws encrypted","algorithm":"rsa-oaep-sha256"}`)
 
 	if err := bobConn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
 		t.Fatalf("expected set read deadline success, got error: %v", err)
@@ -43,18 +43,25 @@ func TestWebSocketDeliversChatMessageToOnlineFriend(t *testing.T) {
 		Data struct {
 			SenderID   uint64 `json:"senderId"`
 			ReceiverID uint64 `json:"receiverId"`
-			Content    string `json:"content"`
+			Ciphertext string `json:"ciphertext"`
+			Algorithm  string `json:"algorithm"`
 			CreatedAt  string `json:"createdAt"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(message, &envelope); err != nil {
 		t.Fatalf("expected valid websocket json, got error: %v", err)
 	}
+	if bytes.Contains(message, []byte("\"content\"")) {
+		t.Fatalf("expected websocket payload without plaintext content field, got %s", string(message))
+	}
 	if envelope.Type != "chat_message" {
 		t.Fatalf("expected chat_message, got %q", envelope.Type)
 	}
-	if envelope.Data.Content != "hello ws" {
-		t.Fatalf("expected delivered content hello ws, got %q", envelope.Data.Content)
+	if envelope.Data.Ciphertext != "hello ws encrypted" {
+		t.Fatalf("expected delivered ciphertext hello ws encrypted, got %q", envelope.Data.Ciphertext)
+	}
+	if envelope.Data.Algorithm != "rsa-oaep-sha256" {
+		t.Fatalf("expected delivered algorithm rsa-oaep-sha256, got %q", envelope.Data.Algorithm)
 	}
 	if envelope.Data.CreatedAt == "" {
 		t.Fatalf("expected delivered createdAt, got empty payload %#v", envelope.Data)

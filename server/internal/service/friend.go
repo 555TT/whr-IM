@@ -22,11 +22,13 @@ type CreateFriendRequestInput struct {
 }
 
 type FriendListItem struct {
-	UserID    uint64 `json:"userId"`
-	FriendID  uint64 `json:"friendId"`
-	Nickname  string `json:"nickname"`
-	Avatar    string `json:"avatar"`
-	Signature string `json:"signature"`
+	UserID             uint64 `json:"userId"`
+	FriendID           uint64 `json:"friendId"`
+	Nickname           string `json:"nickname"`
+	Avatar             string `json:"avatar"`
+	Signature          string `json:"signature"`
+	PublicKey          string `json:"publicKey"`
+	PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
 }
 
 type IncomingFriendRequestItem struct {
@@ -102,7 +104,15 @@ func (s *FriendService) ListFriends(userID uint64) ([]FriendListItem, error) {
 		if err != nil {
 			return nil, err
 		}
-		items = append(items, FriendListItem{UserID: friend.UserID, FriendID: friend.FriendID, Nickname: profile.Nickname, Avatar: profile.Avatar, Signature: profile.Signature})
+		items = append(items, FriendListItem{
+			UserID:             friend.UserID,
+			FriendID:           friend.FriendID,
+			Nickname:           profile.Nickname,
+			Avatar:             profile.Avatar,
+			Signature:          profile.Signature,
+			PublicKey:          profile.PublicKey,
+			PublicKeyAlgorithm: profile.PublicKeyAlgorithm,
+		})
 	}
 	return items, nil
 }

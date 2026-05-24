@@ -18,8 +18,9 @@ func NewMessageHandler(messageService *service.MessageService) *MessageHandler {
 }
 
 type createMessageRequest struct {
-	ReceiverID uint64  `json:"receiverId"`
-	Content    string `json:"content"`
+	ReceiverID uint64 `json:"receiverId"`
+	Ciphertext string `json:"ciphertext"`
+	Algorithm  string `json:"algorithm"`
 }
 
 func (h *MessageHandler) Create(c *gin.Context) {
@@ -28,7 +29,11 @@ func (h *MessageHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid request"})
 		return
 	}
-	message, err := h.messageService.Create(c.MustGet("userID").(uint64), service.CreateMessageInput{ReceiverID: req.ReceiverID, Content: req.Content})
+	message, err := h.messageService.Create(c.MustGet("userID").(uint64), service.CreateMessageInput{
+		ReceiverID: req.ReceiverID,
+		Ciphertext: req.Ciphertext,
+		Algorithm:  req.Algorithm,
+	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return

@@ -66,6 +66,7 @@ func NewWithRepositories(userRepo repository.UserRepository, friendRepo reposito
 	authed.Use(middleware.Auth(authService))
 	authed.GET("/users/me", authHandler.Me)
 	authed.PUT("/users/me", authHandler.UpdateMe)
+	authed.PUT("/users/me/public-key", authHandler.UpdateMyPublicKey)
 
 	if friendRepo != nil {
 		friendService := service.NewFriendService(friendRepo, userRepo)

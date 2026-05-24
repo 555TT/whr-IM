@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"whr-im/server/internal/repository"
@@ -32,6 +33,11 @@ type updateProfileRequest struct {
 	Nickname  string `json:"nickname"`
 	Gender    int    `json:"gender"`
 	Signature string `json:"signature"`
+}
+
+type updatePublicKeyRequest struct {
+	PublicKey string `json:"publicKey"`
+	Algorithm string `json:"algorithm"`
 }
 
 func (h *AuthUserHandler) Register(c *gin.Context) {
@@ -104,6 +110,30 @@ func (h *AuthUserHandler) UpdateMe(c *gin.Context) {
 	})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
+
+func (h *AuthUserHandler) UpdateMyPublicKey(c *gin.Context) {
+	var req updatePublicKeyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid request"})
+		return
+	}
+
+	userID := c.MustGet("userID").(uint64)
+	user, err := h.authService.UpdatePublicKey(userID, service.UpdatePublicKeyInput{
+		PublicKey: req.PublicKey,
+		Algorithm: req.Algorithm,
+	})
+	if err != nil {
+		status := http.StatusNotFound
+		if errors.Is(err, service.ErrInvalidPublicKey) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"message": err.Error()})
 		return
 	}
 
