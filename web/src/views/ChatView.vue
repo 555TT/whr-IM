@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import AppNav from '../components/AppNav.vue'
 import { http } from '../api/http'
@@ -29,6 +29,8 @@ const currentFriendId = ref<number | null>(null)
 const draft = ref('')
 const errorMessage = ref('')
 const socketConnected = ref(false)
+const sending = ref(false)
+const messageListRef = ref<HTMLElement | null>(null)
 let socket: WebSocket | null = null
 
 const currentFriend = computed(() => friends.value.find((item) => item.friendId === currentFriendId.value) || null)
@@ -53,6 +55,7 @@ async function loadMessages() {
   }
   const { data } = await http.get(`/messages?friendId=${currentFriendId.value}`)
   messages.value = data
+  await scrollToBottom()
 }
 
 async function selectFriend(friendId: number) {
@@ -61,8 +64,9 @@ async function selectFriend(friendId: number) {
 }
 
 async function sendMessage() {
-  if (!currentFriendId.value || !draft.value.trim()) return
+  if (!currentFriendId.value || !draft.value.trim() || sending.value) return
   errorMessage.value = ''
+  sending.value = true
   try {
     const { data } = await http.post('/messages', {
       receiverId: currentFriendId.value,
@@ -70,8 +74,11 @@ async function sendMessage() {
     })
     messages.value.push(data)
     draft.value = ''
+    await scrollToBottom()
   } catch (error) {
     errorMessage.value = (error as Error).message
+  } finally {
+    sending.value = false
   }
 }
 
@@ -91,7 +98,7 @@ function connectSocket() {
   socket.onerror = () => {
     errorMessage.value = 'WebSocket 连接失败'
   }
-  socket.onmessage = (event) => {
+  socket.onmessage = async (event) => {
     const payload = JSON.parse(event.data)
     if (payload.type === 'chat_message') {
       const chatMessage = payload.data as ChatMessage
@@ -100,10 +107,22 @@ function connectSocket() {
         (chatMessage.senderId === currentFriendId.value || chatMessage.receiverId === currentFriendId.value)
       ) {
         messages.value.push(chatMessage)
+        await scrollToBottom()
       }
     }
   }
 }
+
+async function scrollToBottom() {
+  await nextTick()
+  if (messageListRef.value) {
+    messageListRef.value.scrollTop = messageListRef.value.scrollHeight
+  }
+}
+
+watch(messages, () => {
+  scrollToBottom()
+}, { deep: true })
 
 onMounted(async () => {
   try {
@@ -121,13 +140,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="page-shell page-layout">
+  <div class="page-shell apple-page">
     <AppNav />
-    <div class="chat-layout">
-      <aside class="card sidebar">
-        <div class="sidebar-header">
-          <h3>好友列表</h3>
-          <small>{{ socketConnected ? 'WS 已连接' : 'WS 未连接' }}</small>
+    <section class="chat-shell card">
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <div>
+            <p class="apple-label">Contacts</p>
+            <h2>好友列表</h2>
+          </div>
+          <small class="muted">{{ socketConnected ? '在线同步中' : '等待连接' }}</small>
         </div>
         <div v-if="friends.length === 0" class="empty-state">暂无好友，请先在好友申请页添加好友。</div>
         <button
@@ -137,22 +159,27 @@ onBeforeUnmount(() => {
           :class="{ active: currentFriendId === friend.friendId }"
           @click="selectFriend(friend.friendId)"
         >
-          <strong>{{ friend.nickname }}</strong>
-          <small>ID: {{ friend.friendId }}</small>
-          <span>{{ friend.signature || '这个人很懒，还没写签名。' }}</span>
+          <div class="friend-avatar">{{ friend.nickname.slice(0, 1).toUpperCase() }}</div>
+          <div class="friend-copy">
+            <strong>{{ friend.nickname }}</strong>
+            <small>ID: {{ friend.friendId }}</small>
+            <span>{{ friend.signature || '这个人很懒，还没写签名。' }}</span>
+          </div>
         </button>
       </aside>
-      <section class="card chat-panel">
-        <div class="chat-header">
+
+      <section class="chat-panel">
+        <div class="chat-top">
           <div>
-            <h3>聊天窗口</h3>
-            <small v-if="currentFriend">当前聊天：{{ currentFriend.nickname }}</small>
+            <p class="apple-label">Conversation</p>
+            <h2>{{ currentFriend ? currentFriend.nickname : '聊天窗口' }}</h2>
+            <small class="muted" v-if="authStore.user">当前身份：{{ authStore.user.nickname || authStore.user.username }}</small>
           </div>
-          <button class="refresh-btn" @click="loadFriends">刷新好友</button>
+          <button class="apple-button secondary" @click="loadFriends">刷新好友</button>
         </div>
-        <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
+        <p v-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
         <div v-if="!currentFriendId" class="empty-state">请选择一个好友开始聊天</div>
-        <div v-else class="messages">
+        <div v-else ref="messageListRef" class="messages">
           <div
             v-for="(message, index) in messages"
             :key="index"
@@ -166,65 +193,111 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="composer">
-          <input v-model="draft" :disabled="!currentFriendId" placeholder="输入消息" @keyup.enter="sendMessage" />
-          <button :disabled="!currentFriendId" @click="sendMessage">发送</button>
+          <input
+            v-model="draft"
+            class="apple-input"
+            :disabled="!currentFriendId || sending"
+            placeholder="输入消息"
+            @keyup.enter="sendMessage"
+          />
+          <button class="apple-button" :disabled="!currentFriendId || sending" @click="sendMessage">
+            {{ sending ? '发送中...' : '发送' }}
+          </button>
         </div>
       </section>
-    </div>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.page-layout {
-  padding: 24px;
-}
-
-.chat-layout {
+.chat-shell {
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 20px;
-}
-
-.sidebar,
-.chat-panel {
-  padding: 20px;
+  grid-template-columns: 340px 1fr;
+  min-height: 760px;
+  overflow: hidden;
 }
 
 .sidebar {
+  padding: 28px 22px;
+  border-right: 1px solid rgba(29, 29, 31, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.52);
 }
 
-.sidebar-header,
-.chat-header {
+.sidebar-top,
+.chat-top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.sidebar-top h2,
+.chat-top h2 {
+  margin: 6px 0 0;
+  font-size: 28px;
+  letter-spacing: -0.03em;
 }
 
 .friend-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 12px;
-  border: 1px solid #dbe4f0;
-  border-radius: 8px;
-  background: #f8fbff;
-  color: #1f2937;
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: none;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.82);
+  text-align: left;
+  box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.05);
 }
 
 .friend-item.active {
-  border-color: #2563eb;
-  background: #eff6ff;
+  background: rgba(0, 113, 227, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.18);
+}
+
+.friend-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #eef5ff 0%, #d9e8ff 100%);
+  color: #0071e3;
+  font-weight: 700;
+}
+
+.friend-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.friend-copy small,
+.friend-copy span {
+  color: #6e6e73;
+}
+
+.chat-panel {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
 .messages {
-  min-height: 360px;
+  flex: 1;
+  min-height: 420px;
+  max-height: 520px;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 16px 0;
+  gap: 14px;
+  padding: 8px 6px 8px 0;
 }
 
 .message-row {
@@ -236,51 +309,40 @@ onBeforeUnmount(() => {
 }
 
 .message-item {
-  max-width: 70%;
-  padding: 12px;
-  border-radius: 8px;
-  background: #f3f4f6;
+  max-width: 68%;
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: rgba(245, 245, 247, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.04);
 }
 
 .message-row.mine .message-item {
-  background: #dbeafe;
+  background: linear-gradient(180deg, #d7ebff 0%, #c6e0ff 100%);
+}
+
+.message-item strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.message-item p {
+  margin: 0;
 }
 
 .composer {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   gap: 12px;
 }
 
-input {
-  flex: 1;
-  padding: 12px 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-}
+@media (max-width: 980px) {
+  .chat-shell {
+    grid-template-columns: 1fr;
+  }
 
-button {
-  padding: 12px 16px;
-  border: none;
-  border-radius: 8px;
-  background: #2563eb;
-  color: white;
-  cursor: pointer;
-}
-
-.refresh-btn {
-  background: #4b5563;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.empty-state {
-  color: #6b7280;
-}
-
-.error-text {
-  color: #dc2626;
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid rgba(29, 29, 31, 0.08);
+  }
 }
 </style>

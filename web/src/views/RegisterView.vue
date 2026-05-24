@@ -1,38 +1,34 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { reactive, ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 
 import { http } from '../api/http'
-import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
-const route = useRoute()
-const authStore = useAuthStore()
 const errorMessage = ref('')
+const successMessage = ref('')
 const loading = ref(false)
 
 const form = reactive({
-  username: typeof route.query.username === 'string' ? route.query.username : '',
-  password: ''
+  username: '',
+  password: '',
+  confirmPassword: ''
 })
 
-watch(
-  () => route.query.username,
-  (value) => {
-    form.username = typeof value === 'string' ? value : ''
-  }
-)
-
-async function login() {
+async function register() {
   errorMessage.value = ''
+  successMessage.value = ''
   loading.value = true
   try {
-    const { data } = await http.post('/auth/login', {
-      username: form.username,
-      password: form.password
-    })
-    authStore.setSession(data.token, data.user)
-    router.push('/chat')
+    const { data } = await http.post('/auth/register', form)
+    successMessage.value = `注册成功：${data.user.username}，正在跳转登录页。`
+    const username = form.username
+    form.username = ''
+    form.password = ''
+    form.confirmPassword = ''
+    setTimeout(() => {
+      router.push({ path: '/login', query: { username } })
+    }, 800)
   } catch (error) {
     errorMessage.value = (error as Error).message
   } finally {
@@ -45,24 +41,26 @@ async function login() {
   <div class="page-shell auth-page">
     <div class="auth-hero">
       <div class="hero-copy">
-        <p class="apple-label">Easy Chat</p>
-        <h1 class="apple-title">简单、克制、专注的即时沟通体验。</h1>
+        <p class="apple-label">Create account</p>
+        <h1 class="apple-title">创建你的 Easy Chat 账号。</h1>
         <p class="apple-subtitle">
-          面向课程项目的 Web 端 IM，提供账号、好友、聊天与资料管理能力。
+          完成注册后，即可体验好友申请、实时聊天与资料管理功能。
         </p>
       </div>
       <div class="card auth-card">
         <div class="auth-card-head">
-          <h2>登录</h2>
-          <p class="muted">使用你的账号继续进入聊天空间。</p>
+          <h2>注册</h2>
+          <p class="muted">填写基础信息，快速创建新账号。</p>
         </div>
+        <p v-if="successMessage" class="status-text success">{{ successMessage }}</p>
         <p v-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
         <input v-model="form.username" class="apple-input" placeholder="用户名" />
         <input v-model="form.password" class="apple-input" type="password" placeholder="密码" />
-        <button class="apple-button" :disabled="loading" @click="login">登录</button>
+        <input v-model="form.confirmPassword" class="apple-input" type="password" placeholder="确认密码" />
+        <button class="apple-button" :disabled="loading" @click="register">注册账号</button>
         <p class="switch-text muted">
-          还没有账号？
-          <RouterLink to="/register">去注册</RouterLink>
+          已有账号？
+          <RouterLink to="/login">返回登录</RouterLink>
         </p>
       </div>
     </div>

@@ -65,90 +65,91 @@ onMounted(loadRequests)
 </script>
 
 <template>
-  <div class="page-shell page-layout">
+  <div class="page-shell apple-page">
     <AppNav />
-    <div class="card content-card">
-      <h2>好友申请</h2>
-      <p v-if="feedback" class="success-text">{{ feedback }}</p>
-      <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
-      <div class="send-row">
-        <input v-model.number="toUserId" type="number" placeholder="目标用户 ID" />
-        <input v-model="note" placeholder="申请附言" />
-        <button @click="sendRequest">发送申请</button>
+    <section class="requests-layout">
+      <div class="card apple-panel request-form-card">
+        <p class="apple-label">Add friend</p>
+        <h1>发起好友申请</h1>
+        <p class="muted">输入目标用户 ID，并附上一句简短说明。</p>
+        <p v-if="feedback" class="status-text success">{{ feedback }}</p>
+        <p v-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
+        <input v-model.number="toUserId" class="apple-input" type="number" placeholder="目标用户 ID" />
+        <input v-model="note" class="apple-input" placeholder="申请附言" />
+        <button class="apple-button" @click="sendRequest">发送申请</button>
       </div>
-      <div v-if="requests.length === 0" class="empty-state">暂无收到的待处理好友申请</div>
-      <div v-for="item in requests" :key="item.id" class="request-row">
-        <div>
-          <strong>来自用户 {{ item.fromUserId }}</strong>
-          <p>{{ item.message || '无附言' }}</p>
-          <small>{{ item.status }}</small>
+
+      <div class="card apple-panel request-list-card">
+        <div class="list-head">
+          <div>
+            <p class="apple-label">Incoming</p>
+            <h2>收到的好友申请</h2>
+          </div>
         </div>
-        <div class="request-actions">
-          <button @click="accept(item.id)">同意</button>
-          <button class="ghost" @click="reject(item.id)">拒绝</button>
+        <div v-if="requests.length === 0" class="empty-state">暂无收到的待处理好友申请</div>
+        <div v-for="item in requests" :key="item.id" class="request-row">
+          <div class="request-copy">
+            <strong>来自用户 {{ item.fromUserId }}</strong>
+            <p>{{ item.message || '无附言' }}</p>
+          </div>
+          <div class="request-actions">
+            <button class="apple-button secondary" @click="accept(item.id)">同意</button>
+            <button class="apple-button danger" @click="reject(item.id)">拒绝</button>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.page-layout {
-  padding: 24px;
+.requests-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
 }
 
-.content-card {
-  padding: 24px;
+.request-form-card,
+.request-list-card {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
-.send-row,
+.request-form-card h1,
+.request-list-card h2 {
+  margin: 6px 0 0;
+  font-size: 34px;
+  letter-spacing: -0.03em;
+}
+
 .request-row {
   display: flex;
-  gap: 12px;
   align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 0;
+  border-top: 1px solid rgba(29, 29, 31, 0.08);
 }
 
-.send-row input {
-  flex: 1;
-}
-
-input {
-  padding: 12px 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-}
-
-button {
-  padding: 10px 14px;
-  border: none;
-  border-radius: 8px;
-  background: #2563eb;
-  color: white;
-  cursor: pointer;
-}
-
-.ghost {
-  background: #ef4444;
+.request-copy p {
+  margin: 6px 0 0;
+  color: #6e6e73;
 }
 
 .request-actions {
   display: flex;
-  gap: 8px;
-  margin-left: auto;
+  gap: 10px;
 }
 
-.empty-state {
-  color: #6b7280;
-}
+@media (max-width: 920px) {
+  .requests-layout {
+    grid-template-columns: 1fr;
+  }
 
-.error-text {
-  color: #dc2626;
-}
-
-.success-text {
-  color: #16a34a;
+  .request-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

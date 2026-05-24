@@ -1,29 +1,29 @@
-import { reactive, ref, watch } from 'vue';
-import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { reactive, ref } from 'vue';
+import { RouterLink, useRouter } from 'vue-router';
 import { http } from '../api/http';
-import { useAuthStore } from '../stores/auth';
 const router = useRouter();
-const route = useRoute();
-const authStore = useAuthStore();
 const errorMessage = ref('');
+const successMessage = ref('');
 const loading = ref(false);
 const form = reactive({
-    username: typeof route.query.username === 'string' ? route.query.username : '',
-    password: ''
+    username: '',
+    password: '',
+    confirmPassword: ''
 });
-watch(() => route.query.username, (value) => {
-    form.username = typeof value === 'string' ? value : '';
-});
-async function login() {
+async function register() {
     errorMessage.value = '';
+    successMessage.value = '';
     loading.value = true;
     try {
-        const { data } = await http.post('/auth/login', {
-            username: form.username,
-            password: form.password
-        });
-        authStore.setSession(data.token, data.user);
-        router.push('/chat');
+        const { data } = await http.post('/auth/register', form);
+        successMessage.value = `注册成功：${data.user.username}，正在跳转登录页。`;
+        const username = form.username;
+        form.username = '';
+        form.password = '';
+        form.confirmPassword = '';
+        setTimeout(() => {
+            router.push({ path: '/login', query: { username } });
+        }, 800);
     }
     catch (error) {
         errorMessage.value = error.message;
@@ -70,6 +70,12 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
     ...{ class: "muted" },
 });
+if (__VLS_ctx.successMessage) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "status-text success" },
+    });
+    (__VLS_ctx.successMessage);
+}
 if (__VLS_ctx.errorMessage) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
         ...{ class: "status-text error" },
@@ -87,8 +93,14 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     placeholder: "密码",
 });
 (__VLS_ctx.form.password);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    ...{ class: "apple-input" },
+    type: "password",
+    placeholder: "确认密码",
+});
+(__VLS_ctx.form.confirmPassword);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.login) },
+    ...{ onClick: (__VLS_ctx.register) },
     ...{ class: "apple-button" },
     disabled: (__VLS_ctx.loading),
 });
@@ -99,10 +111,10 @@ const __VLS_0 = {}.RouterLink;
 /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
 // @ts-ignore
 const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
-    to: "/register",
+    to: "/login",
 }));
 const __VLS_2 = __VLS_1({
-    to: "/register",
+    to: "/login",
 }, ...__VLS_functionalComponentArgsRest(__VLS_1));
 __VLS_3.slots.default;
 var __VLS_3;
@@ -118,7 +130,10 @@ var __VLS_3;
 /** @type {__VLS_StyleScopedClasses['auth-card-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['muted']} */ ;
 /** @type {__VLS_StyleScopedClasses['status-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['success']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-text']} */ ;
 /** @type {__VLS_StyleScopedClasses['error']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
@@ -130,9 +145,10 @@ const __VLS_self = (await import('vue')).defineComponent({
         return {
             RouterLink: RouterLink,
             errorMessage: errorMessage,
+            successMessage: successMessage,
             loading: loading,
             form: form,
-            login: login,
+            register: register,
         };
     },
 });

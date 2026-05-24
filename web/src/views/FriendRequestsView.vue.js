@@ -54,47 +54,70 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {__VLS_StyleScopedClasses['send-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['request-form-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['request-list-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['requests-layout']} */ ;
+/** @type {__VLS_StyleScopedClasses['request-row']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "page-shell page-layout" },
+    ...{ class: "page-shell apple-page" },
 });
 /** @type {[typeof AppNav, ]} */ ;
 // @ts-ignore
 const __VLS_0 = __VLS_asFunctionalComponent(AppNav, new AppNav({}));
 const __VLS_1 = __VLS_0({}, ...__VLS_functionalComponentArgsRest(__VLS_0));
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "card content-card" },
+__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+    ...{ class: "requests-layout" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "card apple-panel request-form-card" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "apple-label" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.h1, __VLS_intrinsicElements.h1)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "muted" },
+});
 if (__VLS_ctx.feedback) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-        ...{ class: "success-text" },
+        ...{ class: "status-text success" },
     });
     (__VLS_ctx.feedback);
 }
 if (__VLS_ctx.errorMessage) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-        ...{ class: "error-text" },
+        ...{ class: "status-text error" },
     });
     (__VLS_ctx.errorMessage);
 }
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "send-row" },
-});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    ...{ class: "apple-input" },
     type: "number",
     placeholder: "目标用户 ID",
 });
 (__VLS_ctx.toUserId);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    ...{ class: "apple-input" },
     placeholder: "申请附言",
 });
 (__VLS_ctx.note);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.sendRequest) },
+    ...{ class: "apple-button" },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "card apple-panel request-list-card" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "list-head" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "apple-label" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({});
 if (__VLS_ctx.requests.length === 0) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "empty-state" },
@@ -105,13 +128,13 @@ for (const [item] of __VLS_getVForSourceType((__VLS_ctx.requests))) {
         key: (item.id),
         ...{ class: "request-row" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "request-copy" },
+    });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
     (item.fromUserId);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
     (item.message || '无附言');
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
-    (item.status);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "request-actions" },
     });
@@ -119,25 +142,43 @@ for (const [item] of __VLS_getVForSourceType((__VLS_ctx.requests))) {
         ...{ onClick: (...[$event]) => {
                 __VLS_ctx.accept(item.id);
             } },
+        ...{ class: "apple-button secondary" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
                 __VLS_ctx.reject(item.id);
             } },
-        ...{ class: "ghost" },
+        ...{ class: "apple-button danger" },
     });
 }
 /** @type {__VLS_StyleScopedClasses['page-shell']} */ ;
-/** @type {__VLS_StyleScopedClasses['page-layout']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-page']} */ ;
+/** @type {__VLS_StyleScopedClasses['requests-layout']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
-/** @type {__VLS_StyleScopedClasses['content-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['success-text']} */ ;
-/** @type {__VLS_StyleScopedClasses['error-text']} */ ;
-/** @type {__VLS_StyleScopedClasses['send-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['request-form-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['success']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['error']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['card']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['request-list-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['list-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
 /** @type {__VLS_StyleScopedClasses['request-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['request-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['request-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['danger']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {

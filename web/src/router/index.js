@@ -3,12 +3,14 @@ import ChatView from '../views/ChatView.vue';
 import FriendRequestsView from '../views/FriendRequestsView.vue';
 import LoginView from '../views/LoginView.vue';
 import ProfileView from '../views/ProfileView.vue';
+import RegisterView from '../views/RegisterView.vue';
 import { useAuthStore } from '../stores/auth';
 const router = createRouter({
     history: createWebHistory(),
     routes: [
-        { path: '/', redirect: '/login' },
+        { path: '/', component: LoginView, meta: { guestOnly: true } },
         { path: '/login', component: LoginView, meta: { guestOnly: true } },
+        { path: '/register', component: RegisterView, meta: { guestOnly: true } },
         { path: '/chat', component: ChatView, meta: { requiresAuth: true } },
         { path: '/friend-requests', component: FriendRequestsView, meta: { requiresAuth: true } },
         { path: '/profile', component: ProfileView, meta: { requiresAuth: true } }
