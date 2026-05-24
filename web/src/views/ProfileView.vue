@@ -4,6 +4,7 @@ import { onMounted, reactive, ref } from 'vue'
 import AppNav from '../components/AppNav.vue'
 import { http } from '../api/http'
 import { useAuthStore } from '../stores/auth'
+import { genderCodeToLabel, genderLabelToCode } from '../utils/gender'
 
 const authStore = useAuthStore()
 const loading = ref(false)
@@ -11,13 +12,13 @@ const message = ref('')
 const errorMessage = ref('')
 const profile = reactive({
   nickname: '',
-  gender: 0,
+  gender: '女',
   signature: ''
 })
 
 function syncProfile() {
   profile.nickname = authStore.user?.nickname || ''
-  profile.gender = authStore.user?.gender || 0
+  profile.gender = genderCodeToLabel(authStore.user?.gender ?? 0)
   profile.signature = authStore.user?.signature || ''
 }
 
@@ -26,7 +27,11 @@ async function saveProfile() {
   message.value = ''
   errorMessage.value = ''
   try {
-    const { data } = await http.put('/users/me', profile)
+    const { data } = await http.put('/users/me', {
+      nickname: profile.nickname,
+      gender: genderLabelToCode(profile.gender),
+      signature: profile.signature
+    })
     authStore.user = data
     syncProfile()
     message.value = '资料已更新'
@@ -60,7 +65,10 @@ onMounted(syncProfile)
         </label>
         <label>
           <span class="apple-label">性别</span>
-          <input v-model.number="profile.gender" class="apple-input" type="number" placeholder="0 / 1 / 2" />
+          <select v-model="profile.gender" class="apple-input">
+            <option value="女">女</option>
+            <option value="男">男</option>
+          </select>
         </label>
       </div>
       <label>

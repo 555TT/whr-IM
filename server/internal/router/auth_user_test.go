@@ -96,38 +96,60 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 		t.Fatalf("expected me username alice, got %q", meResp.Username)
 	}
 
-	updateBody := []byte(`{"nickname":"Alice","gender":2,"signature":"hello im"}`)
-	updateReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader(updateBody))
-	updateReq.Header.Set("Content-Type", "application/json")
-	updateReq.Header.Set("Authorization", "Bearer "+loginResp.Token)
-	updateW := httptest.NewRecorder()
+	updateFemaleBody := []byte(`{"nickname":"Alice","gender":0,"signature":"hello im"}`)
+	updateFemaleReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader(updateFemaleBody))
+	updateFemaleReq.Header.Set("Content-Type", "application/json")
+	updateFemaleReq.Header.Set("Authorization", "Bearer "+loginResp.Token)
+	updateFemaleW := httptest.NewRecorder()
 
-	r.ServeHTTP(updateW, updateReq)
+	r.ServeHTTP(updateFemaleW, updateFemaleReq)
 
-	if updateW.Code != http.StatusOK {
-		t.Fatalf("expected update status 200, got %d with body %s", updateW.Code, updateW.Body.String())
+	if updateFemaleW.Code != http.StatusOK {
+		t.Fatalf("expected female update status 200, got %d with body %s", updateFemaleW.Code, updateFemaleW.Body.String())
 	}
 
-	var updateResp struct {
+	var updateFemaleResp struct {
 		Nickname  string `json:"nickname"`
 		Gender    int    `json:"gender"`
 		Signature string `json:"signature"`
 		Avatar    string `json:"avatar"`
 	}
-	if err := json.Unmarshal(updateW.Body.Bytes(), &updateResp); err != nil {
-		t.Fatalf("expected valid update response json, got error: %v", err)
+	if err := json.Unmarshal(updateFemaleW.Body.Bytes(), &updateFemaleResp); err != nil {
+		t.Fatalf("expected valid female update response json, got error: %v", err)
 	}
-	if updateResp.Nickname != "Alice" {
-		t.Fatalf("expected updated nickname Alice, got %q", updateResp.Nickname)
+	if updateFemaleResp.Nickname != "Alice" {
+		t.Fatalf("expected updated nickname Alice, got %q", updateFemaleResp.Nickname)
 	}
-	if updateResp.Gender != 2 {
-		t.Fatalf("expected updated gender 2, got %d", updateResp.Gender)
+	if updateFemaleResp.Gender != 0 {
+		t.Fatalf("expected updated gender 0 for female, got %d", updateFemaleResp.Gender)
 	}
-	if updateResp.Signature != "hello im" {
-		t.Fatalf("expected updated signature, got %q", updateResp.Signature)
+	if updateFemaleResp.Signature != "hello im" {
+		t.Fatalf("expected updated signature, got %q", updateFemaleResp.Signature)
 	}
-	if updateResp.Avatar == "" {
+	if updateFemaleResp.Avatar == "" {
 		t.Fatal("expected avatar to remain populated")
+	}
+
+	updateMaleBody := []byte(`{"nickname":"Alice","gender":1,"signature":"hello im"}`)
+	updateMaleReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader(updateMaleBody))
+	updateMaleReq.Header.Set("Content-Type", "application/json")
+	updateMaleReq.Header.Set("Authorization", "Bearer "+loginResp.Token)
+	updateMaleW := httptest.NewRecorder()
+
+	r.ServeHTTP(updateMaleW, updateMaleReq)
+
+	if updateMaleW.Code != http.StatusOK {
+		t.Fatalf("expected male update status 200, got %d with body %s", updateMaleW.Code, updateMaleW.Body.String())
+	}
+
+	var updateMaleResp struct {
+		Gender int `json:"gender"`
+	}
+	if err := json.Unmarshal(updateMaleW.Body.Bytes(), &updateMaleResp); err != nil {
+		t.Fatalf("expected valid male update response json, got error: %v", err)
+	}
+	if updateMaleResp.Gender != 1 {
+		t.Fatalf("expected updated gender 1 for male, got %d", updateMaleResp.Gender)
 	}
 }
 
