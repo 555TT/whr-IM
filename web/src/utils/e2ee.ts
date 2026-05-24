@@ -7,6 +7,14 @@ export type EncryptedPayload = {
   algorithm?: string
 }
 
+export type DirectionalEncryptedMessage = {
+  senderId: number
+  senderCiphertext?: string
+  senderAlgorithm?: string
+  receiverCiphertext?: string
+  receiverAlgorithm?: string
+}
+
 export function buildPrivateKeyStorageKey(userId: number) {
   return `e2ee-private-key:${userId}`
 }
@@ -30,6 +38,20 @@ export function buildEncryptedMessageDisplay(
     content: maskEncryptedMessage(decryptedText),
     ...normalizeEncryptedPayload(payload)
   }
+}
+
+export function selectMessagePayloadForUser(message: DirectionalEncryptedMessage, currentUserId?: number | null) {
+  if (currentUserId && message.senderId === currentUserId) {
+    return normalizeEncryptedPayload({
+      ciphertext: message.senderCiphertext,
+      algorithm: message.senderAlgorithm
+    })
+  }
+
+  return normalizeEncryptedPayload({
+    ciphertext: message.receiverCiphertext,
+    algorithm: message.receiverAlgorithm
+  })
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {

@@ -16,7 +16,8 @@ import {
   importPrivateKey,
   importPublicKey,
   loadPrivateKey,
-  savePrivateKey
+  savePrivateKey,
+  selectMessagePayloadForUser
 } from '../utils/e2ee'
 import { createChatSocket } from '../utils/websocket'
 
@@ -34,8 +35,10 @@ interface ChatMessage {
   id?: number
   senderId: number
   receiverId: number
-  ciphertext: string
-  algorithm: string
+  senderCiphertext: string
+  senderAlgorithm: string
+  receiverCiphertext: string
+  receiverAlgorithm: string
   createdAt?: string
 }
 
@@ -120,32 +123,25 @@ async function ensureOwnKeyPair() {
 }
 
 async function toRenderMessage(message: ChatMessage): Promise<RenderMessage> {
+  const payload = selectMessagePayloadForUser(message, authStore.user?.id)
+
   if (!privateKey.value) {
     return {
       ...message,
-      ...buildEncryptedMessageDisplay('', {
-        ciphertext: message.ciphertext,
-        algorithm: message.algorithm
-      })
+      ...buildEncryptedMessageDisplay('', payload)
     }
   }
 
   try {
-    const content = await decryptMessage(privateKey.value, message.ciphertext)
+    const content = await decryptMessage(privateKey.value, payload.ciphertext)
     return {
       ...message,
-      ...buildEncryptedMessageDisplay(content, {
-        ciphertext: message.ciphertext,
-        algorithm: message.algorithm
-      })
+      ...buildEncryptedMessageDisplay(content, payload)
     }
   } catch {
     return {
       ...message,
-      ...buildEncryptedMessageDisplay('', {
-        ciphertext: message.ciphertext,
-        algorithm: message.algorithm
-      })
+      ...buildEncryptedMessageDisplay('', payload)
     }
   }
 }
@@ -193,14 +189,24 @@ async function sendMessage() {
     return
   }
 
+  if (!authStore.user?.publicKey) {
+    errorMessage.value = '当前账号公钥不可用'
+    return
+  }
+
   sending.value = true
   try {
-    const publicKey = await importPublicKey(friend.publicKey)
-    const encrypted = await encryptMessage(publicKey, draft.value.trim())
+    const receiverPublicKey = await importPublicKey(friend.publicKey)
+    const senderPublicKey = await importPublicKey(authStore.user.publicKey)
+    const content = draft.value.trim()
+    const receiverEncrypted = await encryptMessage(receiverPublicKey, content)
+    const senderEncrypted = await encryptMessage(senderPublicKey, content)
     const { data } = await http.post('/messages', {
       receiverId: currentFriendId.value,
-      ciphertext: encrypted.ciphertext,
-      algorithm: encrypted.algorithm
+      senderCiphertext: senderEncrypted.ciphertext,
+      senderAlgorithm: senderEncrypted.algorithm,
+      receiverCiphertext: receiverEncrypted.ciphertext,
+      receiverAlgorithm: receiverEncrypted.algorithm
     })
     messages.value.push(await toRenderMessage(data as ChatMessage))
     draft.value = ''

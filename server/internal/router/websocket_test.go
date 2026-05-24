@@ -28,7 +28,7 @@ func TestWebSocketDeliversChatMessageToOnlineFriend(t *testing.T) {
 	}
 	defer bobConn.Close()
 
-	createMessageHTTP(t, server.URL, aliceToken, `{"receiverId":2,"ciphertext":"hello ws encrypted","algorithm":"rsa-oaep-sha256"}`)
+	createMessageHTTP(t, server.URL, aliceToken, `{"receiverId":2,"senderCiphertext":"hello ws sender copy","senderAlgorithm":"rsa-oaep-sha256","receiverCiphertext":"hello ws encrypted","receiverAlgorithm":"rsa-oaep-sha256"}`)
 
 	if err := bobConn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
 		t.Fatalf("expected set read deadline success, got error: %v", err)
@@ -41,11 +41,13 @@ func TestWebSocketDeliversChatMessageToOnlineFriend(t *testing.T) {
 	var envelope struct {
 		Type string `json:"type"`
 		Data struct {
-			SenderID   uint64 `json:"senderId"`
-			ReceiverID uint64 `json:"receiverId"`
-			Ciphertext string `json:"ciphertext"`
-			Algorithm  string `json:"algorithm"`
-			CreatedAt  string `json:"createdAt"`
+			SenderID           uint64 `json:"senderId"`
+			ReceiverID         uint64 `json:"receiverId"`
+			SenderCiphertext   string `json:"senderCiphertext"`
+			SenderAlgorithm    string `json:"senderAlgorithm"`
+			ReceiverCiphertext string `json:"receiverCiphertext"`
+			ReceiverAlgorithm  string `json:"receiverAlgorithm"`
+			CreatedAt          string `json:"createdAt"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(message, &envelope); err != nil {
@@ -57,11 +59,17 @@ func TestWebSocketDeliversChatMessageToOnlineFriend(t *testing.T) {
 	if envelope.Type != "chat_message" {
 		t.Fatalf("expected chat_message, got %q", envelope.Type)
 	}
-	if envelope.Data.Ciphertext != "hello ws encrypted" {
-		t.Fatalf("expected delivered ciphertext hello ws encrypted, got %q", envelope.Data.Ciphertext)
+	if envelope.Data.SenderCiphertext != "hello ws sender copy" {
+		t.Fatalf("expected delivered sender ciphertext hello ws sender copy, got %q", envelope.Data.SenderCiphertext)
 	}
-	if envelope.Data.Algorithm != "rsa-oaep-sha256" {
-		t.Fatalf("expected delivered algorithm rsa-oaep-sha256, got %q", envelope.Data.Algorithm)
+	if envelope.Data.ReceiverCiphertext != "hello ws encrypted" {
+		t.Fatalf("expected delivered receiver ciphertext hello ws encrypted, got %q", envelope.Data.ReceiverCiphertext)
+	}
+	if envelope.Data.SenderAlgorithm != "rsa-oaep-sha256" {
+		t.Fatalf("expected delivered sender algorithm rsa-oaep-sha256, got %q", envelope.Data.SenderAlgorithm)
+	}
+	if envelope.Data.ReceiverAlgorithm != "rsa-oaep-sha256" {
+		t.Fatalf("expected delivered receiver algorithm rsa-oaep-sha256, got %q", envelope.Data.ReceiverAlgorithm)
 	}
 	if envelope.Data.CreatedAt == "" {
 		t.Fatalf("expected delivered createdAt, got empty payload %#v", envelope.Data)

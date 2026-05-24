@@ -19,6 +19,18 @@ export function buildEncryptedMessageDisplay(decryptedText, payload) {
         ...normalizeEncryptedPayload(payload)
     };
 }
+export function selectMessagePayloadForUser(message, currentUserId) {
+    if (currentUserId && message.senderId === currentUserId) {
+        return normalizeEncryptedPayload({
+            ciphertext: message.senderCiphertext,
+            algorithm: message.senderAlgorithm
+        });
+    }
+    return normalizeEncryptedPayload({
+        ciphertext: message.receiverCiphertext,
+        algorithm: message.receiverAlgorithm
+    });
+}
 function arrayBufferToBase64(buffer) {
     return btoa(String.fromCharCode(...new Uint8Array(buffer)));
 }

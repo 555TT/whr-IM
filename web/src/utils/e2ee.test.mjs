@@ -5,7 +5,8 @@ import {
   buildEncryptedMessageDisplay,
   buildPrivateKeyStorageKey,
   maskEncryptedMessage,
-  normalizeEncryptedPayload
+  normalizeEncryptedPayload,
+  selectMessagePayloadForUser
 } from './e2ee.js'
 
 test('builds per-user private key storage keys', () => {
@@ -36,6 +37,44 @@ test('builds encrypted message display with content field for rendering while pr
     {
       content: '***（已加密）',
       ciphertext: 'cipher',
+      algorithm: 'rsa-oaep-sha256'
+    }
+  )
+})
+
+test('selects sender payload for messages sent by current user', () => {
+  assert.deepEqual(
+    selectMessagePayloadForUser(
+      {
+        senderId: 7,
+        senderCiphertext: 'sender-copy',
+        senderAlgorithm: 'rsa-oaep-sha256',
+        receiverCiphertext: 'receiver-copy',
+        receiverAlgorithm: 'rsa-oaep-sha256'
+      },
+      7
+    ),
+    {
+      ciphertext: 'sender-copy',
+      algorithm: 'rsa-oaep-sha256'
+    }
+  )
+})
+
+test('selects receiver payload for messages received by current user', () => {
+  assert.deepEqual(
+    selectMessagePayloadForUser(
+      {
+        senderId: 7,
+        senderCiphertext: 'sender-copy',
+        senderAlgorithm: 'rsa-oaep-sha256',
+        receiverCiphertext: 'receiver-copy',
+        receiverAlgorithm: 'rsa-oaep-sha256'
+      },
+      9
+    ),
+    {
+      ciphertext: 'receiver-copy',
       algorithm: 'rsa-oaep-sha256'
     }
   )

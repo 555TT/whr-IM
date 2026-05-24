@@ -3,7 +3,7 @@ import AppNav from '../components/AppNav.vue';
 import { http } from '../api/http';
 import { useAuthStore } from '../stores/auth';
 import { formatChatMessageTime } from '../utils/chat-time';
-import { buildEncryptedMessageDisplay, decryptMessage, E2EE_MESSAGE_ALGORITHM, encryptMessage, exportPrivateKey, exportPublicKey, generateKeyPair, importPrivateKey, importPublicKey, loadPrivateKey, savePrivateKey } from '../utils/e2ee';
+import { buildEncryptedMessageDisplay, decryptMessage, E2EE_MESSAGE_ALGORITHM, encryptMessage, exportPrivateKey, exportPublicKey, generateKeyPair, importPrivateKey, importPublicKey, loadPrivateKey, savePrivateKey, selectMessagePayloadForUser } from '../utils/e2ee';
 import { createChatSocket } from '../utils/websocket';
 const authStore = useAuthStore();
 const friends = ref([]);
@@ -64,32 +64,24 @@ async function ensureOwnKeyPair() {
     await uploadOwnPublicKey(serializedPublicKey);
 }
 async function toRenderMessage(message) {
+    const payload = selectMessagePayloadForUser(message, authStore.user?.id);
     if (!privateKey.value) {
         return {
             ...message,
-            ...buildEncryptedMessageDisplay('', {
-                ciphertext: message.ciphertext,
-                algorithm: message.algorithm
-            })
+            ...buildEncryptedMessageDisplay('', payload)
         };
     }
     try {
-        const content = await decryptMessage(privateKey.value, message.ciphertext);
+        const content = await decryptMessage(privateKey.value, payload.ciphertext);
         return {
             ...message,
-            ...buildEncryptedMessageDisplay(content, {
-                ciphertext: message.ciphertext,
-                algorithm: message.algorithm
-            })
+            ...buildEncryptedMessageDisplay(content, payload)
         };
     }
     catch {
         return {
             ...message,
-            ...buildEncryptedMessageDisplay('', {
-                ciphertext: message.ciphertext,
-                algorithm: message.algorithm
-            })
+            ...buildEncryptedMessageDisplay('', payload)
         };
     }
 }
@@ -131,14 +123,23 @@ async function sendMessage() {
         errorMessage.value = '对方未启用端到端加密消息';
         return;
     }
+    if (!authStore.user?.publicKey) {
+        errorMessage.value = '当前账号公钥不可用';
+        return;
+    }
     sending.value = true;
     try {
-        const publicKey = await importPublicKey(friend.publicKey);
-        const encrypted = await encryptMessage(publicKey, draft.value.trim());
+        const receiverPublicKey = await importPublicKey(friend.publicKey);
+        const senderPublicKey = await importPublicKey(authStore.user.publicKey);
+        const content = draft.value.trim();
+        const receiverEncrypted = await encryptMessage(receiverPublicKey, content);
+        const senderEncrypted = await encryptMessage(senderPublicKey, content);
         const { data } = await http.post('/messages', {
             receiverId: currentFriendId.value,
-            ciphertext: encrypted.ciphertext,
-            algorithm: encrypted.algorithm
+            senderCiphertext: senderEncrypted.ciphertext,
+            senderAlgorithm: senderEncrypted.algorithm,
+            receiverCiphertext: receiverEncrypted.ciphertext,
+            receiverAlgorithm: receiverEncrypted.algorithm
         });
         messages.value.push(await toRenderMessage(data));
         draft.value = '';

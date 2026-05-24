@@ -15,8 +15,8 @@ func TestMessageHistoryReturnsConversationInTimeOrder(t *testing.T) {
 	bobToken := registerAndLogin(t, r, "bobby")
 	makeFriends(t, r, aliceToken, bobToken)
 
-	createMessage(t, r, aliceToken, `{"receiverId":2,"ciphertext":"hello bob encrypted","algorithm":"rsa-oaep-sha256"}`)
-	createMessage(t, r, bobToken, `{"receiverId":1,"ciphertext":"hi alice encrypted","algorithm":"rsa-oaep-sha256"}`)
+	createMessage(t, r, aliceToken, `{"receiverId":2,"senderCiphertext":"hello alice copy","senderAlgorithm":"rsa-oaep-sha256","receiverCiphertext":"hello bob encrypted","receiverAlgorithm":"rsa-oaep-sha256"}`)
+	createMessage(t, r, bobToken, `{"receiverId":1,"senderCiphertext":"hi bob copy","senderAlgorithm":"rsa-oaep-sha256","receiverCiphertext":"hi alice encrypted","receiverAlgorithm":"rsa-oaep-sha256"}`)
 
 	historyReq := httptest.NewRequest(http.MethodGet, "/api/messages?friendId=2", nil)
 	historyReq.Header.Set("Authorization", "Bearer "+aliceToken)
@@ -28,11 +28,13 @@ func TestMessageHistoryReturnsConversationInTimeOrder(t *testing.T) {
 	}
 
 	var historyResp []struct {
-		SenderID   uint64 `json:"senderId"`
-		ReceiverID uint64 `json:"receiverId"`
-		Ciphertext string `json:"ciphertext"`
-		Algorithm  string `json:"algorithm"`
-		CreatedAt  string `json:"createdAt"`
+		SenderID           uint64 `json:"senderId"`
+		ReceiverID         uint64 `json:"receiverId"`
+		SenderCiphertext   string `json:"senderCiphertext"`
+		SenderAlgorithm    string `json:"senderAlgorithm"`
+		ReceiverCiphertext string `json:"receiverCiphertext"`
+		ReceiverAlgorithm  string `json:"receiverAlgorithm"`
+		CreatedAt          string `json:"createdAt"`
 	}
 	if err := json.Unmarshal(historyW.Body.Bytes(), &historyResp); err != nil {
 		t.Fatalf("expected valid history json, got error: %v", err)
@@ -43,11 +45,17 @@ func TestMessageHistoryReturnsConversationInTimeOrder(t *testing.T) {
 	if len(historyResp) != 2 {
 		t.Fatalf("expected 2 messages, got %d", len(historyResp))
 	}
-	if historyResp[0].Ciphertext != "hello bob encrypted" || historyResp[1].Ciphertext != "hi alice encrypted" {
-		t.Fatalf("expected ciphertext messages in order, got %#v", historyResp)
+	if historyResp[0].SenderCiphertext != "hello alice copy" || historyResp[1].SenderCiphertext != "hi bob copy" {
+		t.Fatalf("expected sender ciphertexts in order, got %#v", historyResp)
 	}
-	if historyResp[0].Algorithm != "rsa-oaep-sha256" || historyResp[1].Algorithm != "rsa-oaep-sha256" {
-		t.Fatalf("expected message algorithm rsa-oaep-sha256, got %#v", historyResp)
+	if historyResp[0].ReceiverCiphertext != "hello bob encrypted" || historyResp[1].ReceiverCiphertext != "hi alice encrypted" {
+		t.Fatalf("expected receiver ciphertexts in order, got %#v", historyResp)
+	}
+	if historyResp[0].SenderAlgorithm != "rsa-oaep-sha256" || historyResp[1].SenderAlgorithm != "rsa-oaep-sha256" {
+		t.Fatalf("expected sender algorithm rsa-oaep-sha256, got %#v", historyResp)
+	}
+	if historyResp[0].ReceiverAlgorithm != "rsa-oaep-sha256" || historyResp[1].ReceiverAlgorithm != "rsa-oaep-sha256" {
+		t.Fatalf("expected receiver algorithm rsa-oaep-sha256, got %#v", historyResp)
 	}
 	if historyResp[0].CreatedAt == "" || historyResp[1].CreatedAt == "" {
 		t.Fatalf("expected non-empty createdAt values, got %#v", historyResp)
@@ -61,7 +69,7 @@ func TestMessageRejectsUnsupportedAlgorithm(t *testing.T) {
 	bobToken := registerAndLogin(t, r, "bobby")
 	makeFriends(t, r, aliceToken, bobToken)
 
-	messageReq := httptest.NewRequest(http.MethodPost, "/api/messages", bytes.NewReader([]byte(`{"receiverId":2,"ciphertext":"hello bob encrypted","algorithm":"sealed-box"}`)))
+	messageReq := httptest.NewRequest(http.MethodPost, "/api/messages", bytes.NewReader([]byte(`{"receiverId":2,"senderCiphertext":"hello alice copy","senderAlgorithm":"rsa-oaep-sha256","receiverCiphertext":"hello bob encrypted","receiverAlgorithm":"sealed-box"}`)))
 	messageReq.Header.Set("Content-Type", "application/json")
 	messageReq.Header.Set("Authorization", "Bearer "+aliceToken)
 	messageW := httptest.NewRecorder()
