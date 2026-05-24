@@ -1,16 +1,34 @@
 package middleware
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/url"
+	"strings"
 
-var allowedOrigins = map[string]struct{}{
-	"http://127.0.0.1:5174": {},
-	"http://localhost:5174": {},
+	"github.com/gin-gonic/gin"
+)
+
+func isAllowedOrigin(origin string) bool {
+	if origin == "" {
+		return false
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	if parsed.Scheme != "http" {
+		return false
+	}
+
+	hostname := parsed.Hostname()
+	return hostname == "127.0.0.1" || hostname == "localhost"
 }
 
 func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		origin := c.GetHeader("Origin")
-		if _, ok := allowedOrigins[origin]; ok {
+		origin := strings.TrimSpace(c.GetHeader("Origin"))
+		if isAllowedOrigin(origin) {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Vary", "Origin")
 			c.Header("Access-Control-Allow-Credentials", "true")
