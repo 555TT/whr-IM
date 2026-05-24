@@ -2,6 +2,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppNav from '../components/AppNav.vue';
 import { http } from '../api/http';
 import { useAuthStore } from '../stores/auth';
+import { formatChatMessageTime } from '../utils/chat-time';
 import { createChatSocket } from '../utils/websocket';
 const authStore = useAuthStore();
 const friends = ref([]);
@@ -124,6 +125,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['mine']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['message-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar']} */ ;
@@ -177,8 +179,6 @@ for (const [friend] of __VLS_getVForSourceType((__VLS_ctx.friends))) {
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
     (friend.nickname);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
-    (friend.friendId);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     (friend.signature || '这个人很懒，还没写签名。');
 }
@@ -230,8 +230,15 @@ else {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "message-item" },
         });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "message-meta" },
+        });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
         (__VLS_ctx.isMine(message) ? '我' : __VLS_ctx.currentFriend?.nickname || message.senderId);
+        if (__VLS_ctx.formatChatMessageTime(message.createdAt)) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+            (__VLS_ctx.formatChatMessageTime(message.createdAt));
+        }
         __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
         (message.content);
     }
@@ -276,6 +283,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
 /** @type {__VLS_StyleScopedClasses['messages']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['message-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['composer']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
@@ -284,6 +292,7 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             AppNav: AppNav,
+            formatChatMessageTime: formatChatMessageTime,
             authStore: authStore,
             friends: friends,
             messages: messages,

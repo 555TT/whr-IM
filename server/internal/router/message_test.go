@@ -28,10 +28,11 @@ func TestMessageHistoryReturnsConversationInTimeOrder(t *testing.T) {
 	}
 
 	var historyResp []struct {
-		SenderID   uint64  `json:"senderId"`
-		ReceiverID uint64  `json:"receiverId"`
+		SenderID   uint64 `json:"senderId"`
+		ReceiverID uint64 `json:"receiverId"`
 		Content    string `json:"content"`
 		MsgType    string `json:"msgType"`
+		CreatedAt  string `json:"createdAt"`
 	}
 	if err := json.Unmarshal(historyW.Body.Bytes(), &historyResp); err != nil {
 		t.Fatalf("expected valid history json, got error: %v", err)
@@ -44,6 +45,9 @@ func TestMessageHistoryReturnsConversationInTimeOrder(t *testing.T) {
 	}
 	if historyResp[0].MsgType != "text" {
 		t.Fatalf("expected default msgType text, got %q", historyResp[0].MsgType)
+	}
+	if historyResp[0].CreatedAt == "" || historyResp[1].CreatedAt == "" {
+		t.Fatalf("expected non-empty createdAt values, got %#v", historyResp)
 	}
 }
 

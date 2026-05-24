@@ -35,11 +35,12 @@ func TestFriendRequestAcceptAndFriendsListFlow(t *testing.T) {
 	}
 
 	var incomingResp []struct {
-		ID         uint64  `json:"id"`
-		FromUserID uint64  `json:"fromUserId"`
-		ToUserID   uint64  `json:"toUserId"`
-		Message    string `json:"message"`
-		Status     string `json:"status"`
+		ID           uint64 `json:"id"`
+		FromUserID   uint64 `json:"fromUserId"`
+		FromUsername string `json:"fromUsername"`
+		ToUserID     uint64 `json:"toUserId"`
+		Message      string `json:"message"`
+		Status       string `json:"status"`
 	}
 	if err := json.Unmarshal(incomingW.Body.Bytes(), &incomingResp); err != nil {
 		t.Fatalf("expected valid incoming list json, got error: %v", err)
@@ -49,6 +50,9 @@ func TestFriendRequestAcceptAndFriendsListFlow(t *testing.T) {
 	}
 	if incomingResp[0].Status != "pending" {
 		t.Fatalf("expected pending status, got %q", incomingResp[0].Status)
+	}
+	if incomingResp[0].FromUsername != "alice" {
+		t.Fatalf("expected fromUsername alice, got %q", incomingResp[0].FromUsername)
 	}
 
 	acceptReq := httptest.NewRequest(http.MethodPut, "/api/friend-requests/1/accept", nil)

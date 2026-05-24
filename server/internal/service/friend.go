@@ -22,11 +22,20 @@ type CreateFriendRequestInput struct {
 }
 
 type FriendListItem struct {
-	UserID    uint64  `json:"userId"`
-	FriendID  uint64  `json:"friendId"`
+	UserID    uint64 `json:"userId"`
+	FriendID  uint64 `json:"friendId"`
 	Nickname  string `json:"nickname"`
 	Avatar    string `json:"avatar"`
 	Signature string `json:"signature"`
+}
+
+type IncomingFriendRequestItem struct {
+	ID           uint64 `json:"id"`
+	FromUserID   uint64 `json:"fromUserId"`
+	FromUsername string `json:"fromUsername"`
+	ToUserID     uint64 `json:"toUserId"`
+	Message      string `json:"message"`
+	Status       string `json:"status"`
 }
 
 func (s *FriendService) CreateRequest(fromUserID uint64, input CreateFriendRequestInput) (*model.FriendRequest, error) {
@@ -44,8 +53,27 @@ func (s *FriendService) CreateRequest(fromUserID uint64, input CreateFriendReque
 	return request, nil
 }
 
-func (s *FriendService) ListIncomingRequests(userID uint64) ([]model.FriendRequest, error) {
-	return s.friendRepo.ListIncomingRequests(userID)
+func (s *FriendService) ListIncomingRequests(userID uint64) ([]IncomingFriendRequestItem, error) {
+	requests, err := s.friendRepo.ListIncomingRequests(userID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]IncomingFriendRequestItem, 0, len(requests))
+	for _, request := range requests {
+		sender, err := s.userRepo.FindByID(request.FromUserID)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, IncomingFriendRequestItem{
+			ID:           request.ID,
+			FromUserID:   request.FromUserID,
+			FromUsername: sender.Username,
+			ToUserID:     request.ToUserID,
+			Message:      request.Message,
+			Status:       request.Status,
+		})
+	}
+	return items, nil
 }
 
 func (s *FriendService) AcceptRequest(requestID uint64, userID uint64) (*model.FriendRequest, error) {

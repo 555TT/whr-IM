@@ -131,7 +131,7 @@ for (const [item] of __VLS_getVForSourceType((__VLS_ctx.requests))) {
         ...{ class: "request-copy" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
-    (item.fromUserId);
+    (item.fromUsername);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
     (item.message || '无附言');
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({

@@ -7,6 +7,7 @@ import { http } from '../api/http'
 interface FriendRequestItem {
   id: number
   fromUserId: number
+  fromUsername: string
   toUserId: number
   message: string
   status: string
@@ -89,7 +90,7 @@ onMounted(loadRequests)
         <div v-if="requests.length === 0" class="empty-state">暂无收到的待处理好友申请</div>
         <div v-for="item in requests" :key="item.id" class="request-row">
           <div class="request-copy">
-            <strong>来自用户 {{ item.fromUserId }}</strong>
+            <strong>来自 {{ item.fromUsername }}</strong>
             <p>{{ item.message || '无附言' }}</p>
           </div>
           <div class="request-actions">

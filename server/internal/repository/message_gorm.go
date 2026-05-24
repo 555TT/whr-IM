@@ -28,7 +28,7 @@ func (r *GormMessageRepository) Create(message *model.Message) error {
 
 func (r *GormMessageRepository) ListConversation(userID uint64, friendID uint64) ([]model.Message, error) {
 	var messages []model.Message
-	if err := r.db.Where("(sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)", userID, friendID, friendID, userID).Order("id asc").Find(&messages).Error; err != nil {
+	if err := r.db.Where("(sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)", userID, friendID, friendID, userID).Order("created_at asc, id asc").Find(&messages).Error; err != nil {
 		return nil, err
 	}
 	return messages, nil

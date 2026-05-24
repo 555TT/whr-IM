@@ -4,6 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppNav from '../components/AppNav.vue'
 import { http } from '../api/http'
 import { useAuthStore } from '../stores/auth'
+import { formatChatMessageTime } from '../utils/chat-time'
 import { createChatSocket } from '../utils/websocket'
 
 interface FriendItem {
@@ -20,6 +21,7 @@ interface ChatMessage {
   receiverId: number
   content: string
   msgType?: string
+  createdAt?: string
 }
 
 const authStore = useAuthStore()
@@ -162,7 +164,6 @@ onBeforeUnmount(() => {
           <div class="friend-avatar">{{ friend.nickname.slice(0, 1).toUpperCase() }}</div>
           <div class="friend-copy">
             <strong>{{ friend.nickname }}</strong>
-            <small>ID: {{ friend.friendId }}</small>
             <span>{{ friend.signature || '这个人很懒，还没写签名。' }}</span>
           </div>
         </button>
@@ -187,7 +188,10 @@ onBeforeUnmount(() => {
             :class="{ mine: isMine(message) }"
           >
             <div class="message-item">
-              <strong>{{ isMine(message) ? '我' : currentFriend?.nickname || message.senderId }}</strong>
+              <div class="message-meta">
+                <strong>{{ isMine(message) ? '我' : currentFriend?.nickname || message.senderId }}</strong>
+                <small v-if="formatChatMessageTime(message.createdAt)">{{ formatChatMessageTime(message.createdAt) }}</small>
+              </div>
               <p>{{ message.content }}</p>
             </div>
           </div>
@@ -320,9 +324,20 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, #d7ebff 0%, #c6e0ff 100%);
 }
 
+.message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
 .message-item strong {
   display: block;
-  margin-bottom: 6px;
+}
+
+.message-meta small {
+  color: #6e6e73;
 }
 
 .message-item p {

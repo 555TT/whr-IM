@@ -44,6 +44,7 @@ func TestWebSocketDeliversChatMessageToOnlineFriend(t *testing.T) {
 			SenderID   uint64 `json:"senderId"`
 			ReceiverID uint64 `json:"receiverId"`
 			Content    string `json:"content"`
+			CreatedAt  string `json:"createdAt"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(message, &envelope); err != nil {
@@ -54,6 +55,9 @@ func TestWebSocketDeliversChatMessageToOnlineFriend(t *testing.T) {
 	}
 	if envelope.Data.Content != "hello ws" {
 		t.Fatalf("expected delivered content hello ws, got %q", envelope.Data.Content)
+	}
+	if envelope.Data.CreatedAt == "" {
+		t.Fatalf("expected delivered createdAt, got empty payload %#v", envelope.Data)
 	}
 }
 
