@@ -33,7 +33,9 @@ def set_run_font(run, cn='宋体', en='Times New Roman', size=12, bold=False):
 
 
 def add_para(doc, text, size=12, bold=False, align=None, indent_first=True,
-             line_spacing=1.5, space_before=0, space_after=0, cn='宋体', en='Times New Roman'):
+             line_spacing=1.5, space_before=0, space_after=0,
+             cn='宋体', en='Times New Roman', left_indent=0,
+             right_indent=0, hanging=False):
     p = doc.add_paragraph()
     if align is not None:
         p.alignment = align
@@ -41,23 +43,42 @@ def add_para(doc, text, size=12, bold=False, align=None, indent_first=True,
     pf.line_spacing = line_spacing
     pf.space_before = Pt(space_before)
     pf.space_after = Pt(space_after)
-    if indent_first:
+    if left_indent:
+        pf.left_indent = Pt(left_indent)
+    if right_indent:
+        pf.right_indent = Pt(right_indent)
+    if hanging:
+        pf.left_indent = Pt(size * 2)
+        pf.first_line_indent = Pt(-size * 2)
+    elif indent_first:
         pf.first_line_indent = Pt(size * 2)  # 2 chars indent
     run = p.add_run(text)
     set_run_font(run, cn=cn, en=en, size=size, bold=bold)
     return p
 
 
-def add_heading(doc, text, level=1):
-    sizes = {1: 16, 2: 14, 3: 13, 4: 12}
+def add_blank_line(doc, size=12):
+    # 模板大量使用显式空行，而不是只靠段前段后间距
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p.paragraph_format.line_spacing = 1.5
+    r = p.add_run('')
+    set_run_font(r, size=size)
+    return p
+
+
+def add_heading(doc, text, level=1, bold=None, cn='宋体', align=WD_ALIGN_PARAGRAPH.LEFT):
+    # 贴近参考论文：一级16pt，二级15pt，三级14pt，均不加粗
+    sizes = {1: 16, 2: 15, 3: 14, 4: 12}
+    p = doc.add_paragraph()
+    p.alignment = align
     pf = p.paragraph_format
     pf.line_spacing = 1.5
-    pf.space_before = Pt(12 if level <= 2 else 6)
-    pf.space_after = Pt(6)
+    pf.space_before = Pt(0)
+    pf.space_after = Pt(0)
     run = p.add_run(text)
-    set_run_font(run, cn='黑体', en='Times New Roman', size=sizes.get(level, 12), bold=True)
+    if bold is None:
+        bold = False
+    set_run_font(run, cn=cn, en='Times New Roman', size=sizes.get(level, 12), bold=bold)
     return p
 
 
