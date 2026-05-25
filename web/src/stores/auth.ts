@@ -9,6 +9,8 @@ export interface CurrentUser {
   avatar: string
   gender?: number
   signature?: string
+  publicKey?: string
+  publicKeyAlgorithm?: string
 }
 
 export const useAuthStore = defineStore('auth', {

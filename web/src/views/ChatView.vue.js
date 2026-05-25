@@ -3,6 +3,7 @@ import AppNav from '../components/AppNav.vue';
 import { http } from '../api/http';
 import { useAuthStore } from '../stores/auth';
 import { formatChatMessageTime } from '../utils/chat-time';
+import { buildEncryptedMessageDisplay, decryptMessage, E2EE_MESSAGE_ALGORITHM, encryptMessage, exportPrivateKey, exportPublicKey, generateKeyPair, importPrivateKey, importPublicKey, loadPrivateKey, savePrivateKey, selectMessagePayloadForUser } from '../utils/e2ee';
 import { createChatSocket } from '../utils/websocket';
 const authStore = useAuthStore();
 const friends = ref([]);
@@ -12,9 +13,78 @@ const draft = ref('');
 const errorMessage = ref('');
 const socketConnected = ref(false);
 const sending = ref(false);
+const privateKey = ref(null);
 const messageListRef = ref(null);
 let socket = null;
 const currentFriend = computed(() => friends.value.find((item) => item.friendId === currentFriendId.value) || null);
+async function uploadOwnPublicKey(serializedPublicKey) {
+    await http.put('/users/me/public-key', {
+        publicKey: serializedPublicKey,
+        algorithm: E2EE_MESSAGE_ALGORITHM
+    });
+    authStore.user = authStore.user
+        ? {
+            ...authStore.user,
+            publicKey: serializedPublicKey,
+            publicKeyAlgorithm: E2EE_MESSAGE_ALGORITHM
+        }
+        : null;
+}
+async function exportPublicKeyFromPrivateKey(serializedPrivateKey) {
+    const importedPrivateKey = await importPrivateKey(serializedPrivateKey);
+    const jwk = await window.crypto.subtle.exportKey('jwk', importedPrivateKey);
+    const publicKey = await window.crypto.subtle.importKey('jwk', {
+        kty: jwk.kty,
+        n: jwk.n,
+        e: jwk.e,
+        alg: jwk.alg,
+        ext: true,
+        key_ops: ['encrypt']
+    }, { name: 'RSA-OAEP', hash: 'SHA-256' }, true, ['encrypt']);
+    return exportPublicKey(publicKey);
+}
+async function ensureOwnKeyPair() {
+    if (!authStore.user?.id)
+        return;
+    const storedPrivateKey = loadPrivateKey(authStore.user.id);
+    if (storedPrivateKey) {
+        privateKey.value = await importPrivateKey(storedPrivateKey);
+        if (authStore.user.publicKey && authStore.user.publicKeyAlgorithm === E2EE_MESSAGE_ALGORITHM) {
+            return;
+        }
+        const serializedPublicKey = await exportPublicKeyFromPrivateKey(storedPrivateKey);
+        await uploadOwnPublicKey(serializedPublicKey);
+        return;
+    }
+    const keyPair = await generateKeyPair();
+    const serializedPublicKey = await exportPublicKey(keyPair.publicKey);
+    const serializedPrivateKey = await exportPrivateKey(keyPair.privateKey);
+    savePrivateKey(authStore.user.id, serializedPrivateKey);
+    privateKey.value = keyPair.privateKey;
+    await uploadOwnPublicKey(serializedPublicKey);
+}
+async function toRenderMessage(message) {
+    const payload = selectMessagePayloadForUser(message, authStore.user?.id);
+    if (!privateKey.value) {
+        return {
+            ...message,
+            ...buildEncryptedMessageDisplay('', payload)
+        };
+    }
+    try {
+        const content = await decryptMessage(privateKey.value, payload.ciphertext);
+        return {
+            ...message,
+            ...buildEncryptedMessageDisplay(content, payload)
+        };
+    }
+    catch {
+        return {
+            ...message,
+            ...buildEncryptedMessageDisplay('', payload)
+        };
+    }
+}
 async function loadFriends() {
     const { data } = await http.get('/friends');
     friends.value = data;
@@ -33,7 +103,7 @@ async function loadMessages() {
         return;
     }
     const { data } = await http.get(`/messages?friendId=${currentFriendId.value}`);
-    messages.value = data;
+    messages.value = await Promise.all(data.map(toRenderMessage));
     await scrollToBottom();
 }
 async function selectFriend(friendId) {
@@ -44,13 +114,34 @@ async function sendMessage() {
     if (!currentFriendId.value || !draft.value.trim() || sending.value)
         return;
     errorMessage.value = '';
+    if (!privateKey.value) {
+        errorMessage.value = '当前设备没有可用私钥';
+        return;
+    }
+    const friend = currentFriend.value;
+    if (!friend?.publicKey) {
+        errorMessage.value = '对方未启用端到端加密消息';
+        return;
+    }
+    if (!authStore.user?.publicKey) {
+        errorMessage.value = '当前账号公钥不可用';
+        return;
+    }
     sending.value = true;
     try {
+        const receiverPublicKey = await importPublicKey(friend.publicKey);
+        const senderPublicKey = await importPublicKey(authStore.user.publicKey);
+        const content = draft.value.trim();
+        const receiverEncrypted = await encryptMessage(receiverPublicKey, content);
+        const senderEncrypted = await encryptMessage(senderPublicKey, content);
         const { data } = await http.post('/messages', {
             receiverId: currentFriendId.value,
-            content: draft.value.trim()
+            senderCiphertext: senderEncrypted.ciphertext,
+            senderAlgorithm: senderEncrypted.algorithm,
+            receiverCiphertext: receiverEncrypted.ciphertext,
+            receiverAlgorithm: receiverEncrypted.algorithm
         });
-        messages.value.push(data);
+        messages.value.push(await toRenderMessage(data));
         draft.value = '';
         await scrollToBottom();
     }
@@ -83,7 +174,7 @@ function connectSocket() {
             const chatMessage = payload.data;
             if (currentFriendId.value &&
                 (chatMessage.senderId === currentFriendId.value || chatMessage.receiverId === currentFriendId.value)) {
-                messages.value.push(chatMessage);
+                messages.value.push(await toRenderMessage(chatMessage));
                 await scrollToBottom();
             }
         }
@@ -101,6 +192,7 @@ watch(messages, () => {
 onMounted(async () => {
     try {
         await authStore.bootstrap();
+        await ensureOwnKeyPair();
         await loadFriends();
         connectSocket();
     }

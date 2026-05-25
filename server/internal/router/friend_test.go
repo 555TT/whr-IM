@@ -14,6 +14,26 @@ func TestFriendRequestAcceptAndFriendsListFlow(t *testing.T) {
 	aliceToken := registerAndLogin(t, r, "alice")
 	bobToken := registerAndLogin(t, r, "bobby")
 
+	aliceKeyBody := []byte(`{"publicKey":"alice-public-key","algorithm":"rsa-oaep-sha256"}`)
+	aliceKeyReq := httptest.NewRequest(http.MethodPut, "/api/users/me/public-key", bytes.NewReader(aliceKeyBody))
+	aliceKeyReq.Header.Set("Content-Type", "application/json")
+	aliceKeyReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	aliceKeyW := httptest.NewRecorder()
+	r.ServeHTTP(aliceKeyW, aliceKeyReq)
+	if aliceKeyW.Code != http.StatusOK {
+		t.Fatalf("expected alice public key update status 200, got %d with body %s", aliceKeyW.Code, aliceKeyW.Body.String())
+	}
+
+	bobKeyBody := []byte(`{"publicKey":"bob-public-key","algorithm":"rsa-oaep-sha256"}`)
+	bobKeyReq := httptest.NewRequest(http.MethodPut, "/api/users/me/public-key", bytes.NewReader(bobKeyBody))
+	bobKeyReq.Header.Set("Content-Type", "application/json")
+	bobKeyReq.Header.Set("Authorization", "Bearer "+bobToken)
+	bobKeyW := httptest.NewRecorder()
+	r.ServeHTTP(bobKeyW, bobKeyReq)
+	if bobKeyW.Code != http.StatusOK {
+		t.Fatalf("expected bob public key update status 200, got %d with body %s", bobKeyW.Code, bobKeyW.Body.String())
+	}
+
 	requestBody := []byte(`{"toUsername":"bobby","message":"add me"}`)
 	requestReq := httptest.NewRequest(http.MethodPost, "/api/friend-requests", bytes.NewReader(requestBody))
 	requestReq.Header.Set("Content-Type", "application/json")
@@ -74,11 +94,13 @@ func TestFriendRequestAcceptAndFriendsListFlow(t *testing.T) {
 	}
 
 	var friendsResp []struct {
-		UserID    uint64  `json:"userId"`
-		FriendID  uint64  `json:"friendId"`
-		Nickname  string `json:"nickname"`
-		Avatar    string `json:"avatar"`
-		Signature string `json:"signature"`
+		UserID             uint64 `json:"userId"`
+		FriendID           uint64 `json:"friendId"`
+		Nickname           string `json:"nickname"`
+		Avatar             string `json:"avatar"`
+		Signature          string `json:"signature"`
+		PublicKey          string `json:"publicKey"`
+		PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
 	}
 	if err := json.Unmarshal(friendsW.Body.Bytes(), &friendsResp); err != nil {
 		t.Fatalf("expected valid friends list json, got error: %v", err)
@@ -88,6 +110,12 @@ func TestFriendRequestAcceptAndFriendsListFlow(t *testing.T) {
 	}
 	if friendsResp[0].FriendID != 2 {
 		t.Fatalf("expected friend id 2, got %d", friendsResp[0].FriendID)
+	}
+	if friendsResp[0].PublicKey != "bob-public-key" {
+		t.Fatalf("expected friend publicKey bob-public-key, got %q", friendsResp[0].PublicKey)
+	}
+	if friendsResp[0].PublicKeyAlgorithm != "rsa-oaep-sha256" {
+		t.Fatalf("expected friend publicKeyAlgorithm rsa-oaep-sha256, got %q", friendsResp[0].PublicKeyAlgorithm)
 	}
 }
 

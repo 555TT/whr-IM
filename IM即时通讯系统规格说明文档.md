@@ -17,6 +17,7 @@
 - 同意/拒绝好友申请
 - 好友列表管理
 - 与好友进行实时单聊
+- 基于 RSA-OAEP 的端到端加密文本消息
 
 ### 1.4 项目范围
 本项目当前范围为 **MVP 单聊版**，仅支持：
@@ -233,13 +234,19 @@ whr-im/
 ### 处理逻辑
 - 校验发送方已登录
 - 校验接收方是好友
-- 保存消息到数据库
-- 若接收方在线，则通过 WebSocket 实时推送
-- 向发送方返回发送确认
+- 发送方客户端在本地生成或加载自己的 RSA-OAEP 密钥对，并确保公钥已上传到服务端
+- 发送方客户端从好友列表中获取接收方公钥
+- 对同一条明文分别使用发送方公钥与接收方公钥加密，生成两份密文：
+  - `senderCiphertext`：仅发送方自己的私钥可解密
+  - `receiverCiphertext`：仅接收方自己的私钥可解密
+- 客户端向后端提交 `receiverId`、两份密文及对应算法标识 `rsa-oaep-sha256`
+- 后端校验密文与算法字段完整性后保存消息到数据库
+- 若接收方在线，则通过 WebSocket 实时推送该条消息
+- 发送方通过创建消息接口返回体拿到已保存消息，用本地私钥解密 `senderCiphertext` 后展示明文
 
 ### 输出
-- 发送成功回执
-- 接收方收到实时消息
+- 发送成功回执（响应中仅包含双份密文，不返回明文）
+- 接收方收到实时消息（消息体仅包含双份密文，不返回明文）
 
 ---
 
@@ -250,8 +257,15 @@ whr-im/
 ### 展示内容
 - 发送方
 - 接收方
-- 消息内容
+- 消息内容（由当前登录用户使用本地私钥解密自己可读的那份密文后展示）
 - 发送时间
+
+### 处理逻辑
+- 前端请求 `/api/messages?friendId=...` 获取历史消息
+- 若当前登录用户是该条消息发送方，则优先取 `senderCiphertext`
+- 若当前登录用户是该条消息接收方，则优先取 `receiverCiphertext`
+- 前端使用本地保存的私钥解密对应密文并展示明文
+- 若本地私钥不存在或解密失败，则以前端占位文案 `***（已加密）` 展示，不向服务端请求明文兜底
 
 ---
 
@@ -267,6 +281,9 @@ whr-im/
 - 登录鉴权使用 JWT
 - 接口需校验身份
 - WebSocket 建连时需校验 token
+- 聊天明文不落库，服务端只保存密文与算法标识
+- 每个用户需维护自己的公私钥对：公钥上传服务端用于被他人加密，私钥仅保存在本地浏览器 `localStorage`
+- 聊天消息当前采用 `RSA-OAEP + SHA-256`（标识为 `rsa-oaep-sha256`）进行端到端加密
 
 ### 5.3 可维护性要求
 - 后端分层清晰
@@ -294,6 +311,8 @@ whr-im/
 | avatar | varchar | 系统默认头像地址，不允许用户修改 |
 | gender | tinyint | 性别 |
 | signature | varchar | 个性签名 |
+| public_key | text | 用户公钥 |
+| public_key_algorithm | varchar | 公钥算法标识 |
 | created_at | datetime | 创建时间 |
 | updated_at | datetime | 更新时间 |
 
@@ -334,8 +353,10 @@ whr-im/
 | id | bigint | 主键 |
 | sender_id | bigint | 发送者 ID |
 | receiver_id | bigint | 接收者 ID |
-| content | text | 消息内容 |
-| msg_type | varchar | 消息类型，MVP 先支持 text |
+| sender_ciphertext | text | 发送方可解密密文 |
+| sender_algorithm | varchar | 发送方密文算法标识 |
+| receiver_ciphertext | text | 接收方可解密密文 |
+| receiver_algorithm | varchar | 接收方密文算法标识 |
 | created_at | datetime | 发送时间 |
 
 ---
@@ -432,8 +453,55 @@ whr-im/
 
 ## 7.5 消息接口
 
+### 上传当前用户公钥
+**PUT** `/api/users/me/public-key`
+
+请求参数：
+```json
+{
+  "publicKey": "base64-spki-public-key",
+  "algorithm": "rsa-oaep-sha256"
+}
+```
+
+说明：
+- 用户登录后，客户端需确保当前账号公钥已上传
+- 服务端保存公钥，供好友发送加密消息时使用
+
+### 发送消息
+**POST** `/api/messages`
+
+请求参数：
+```json
+{
+  "receiverId": 2,
+  "senderCiphertext": "base64-ciphertext-for-sender",
+  "senderAlgorithm": "rsa-oaep-sha256",
+  "receiverCiphertext": "base64-ciphertext-for-receiver",
+  "receiverAlgorithm": "rsa-oaep-sha256"
+}
+```
+
+响应示例：
+```json
+{
+  "id": 1001,
+  "senderId": 1,
+  "receiverId": 2,
+  "senderCiphertext": "base64-ciphertext-for-sender",
+  "senderAlgorithm": "rsa-oaep-sha256",
+  "receiverCiphertext": "base64-ciphertext-for-receiver",
+  "receiverAlgorithm": "rsa-oaep-sha256",
+  "createdAt": "2026-05-25T10:00:00Z"
+}
+```
+
 ### 获取历史消息
 **GET** `/api/messages?friendId=2`
+
+响应说明：
+- 返回聊天记录数组
+- 每条记录仅返回双份密文与算法标识，不返回明文内容
 
 ---
 
@@ -473,11 +541,19 @@ whr-im/
     "id": 1001,
     "senderId": 1,
     "receiverId": 2,
-    "content": "你好",
-    "createdAt": "2026-05-24 10:00:00"
+    "senderCiphertext": "base64-ciphertext-for-sender",
+    "senderAlgorithm": "rsa-oaep-sha256",
+    "receiverCiphertext": "base64-ciphertext-for-receiver",
+    "receiverAlgorithm": "rsa-oaep-sha256",
+    "createdAt": "2026-05-24T10:00:00Z"
   }
 }
 ```
+
+说明：
+- 服务端通过 WebSocket 仅推送密文，不推送明文
+- 接收方前端使用本地私钥解密 `receiverCiphertext`
+- 发送方本地展示已发送消息时使用本地私钥解密 `senderCiphertext`
 
 ### 发送确认
 ```json
@@ -542,11 +618,53 @@ whr-im/
 5. A 和 B 可开始聊天
 
 ## 10.3 聊天流程
-1. 用户打开与好友的聊天窗口
-2. 前端加载历史消息
-3. 用户通过 WebSocket 发送消息
-4. 后端保存消息并推送给对方
-5. 前端展示实时消息
+1. 用户登录后，前端生成或加载本地 RSA 私钥，并将对应公钥上传到服务端
+2. 用户打开与好友的聊天窗口
+3. 前端加载历史消息，并按“我是发送方/我是接收方”选择对应密文进行本地解密展示
+4. 用户输入明文消息后，前端分别使用自己的公钥和好友公钥加密同一条消息
+5. 前端调用消息发送接口提交双份密文
+6. 后端校验、保存消息，并通过 WebSocket 将同一条双份密文消息推送给接收方
+7. 发送方与接收方各自在本地使用自己的私钥解密可读密文并展示明文
+
+## 10.4 消息加解密流程说明
+### 流程概述
+系统聊天消息采用基于 `RSA-OAEP + SHA-256` 的端到端加密方案。消息明文仅在发送端与接收端浏览器本地参与加密和解密，服务端不处理消息明文，只负责保存和转发密文。
+
+### 详细流程
+1. **登录后的密钥准备**
+   - 用户登录后，前端为当前用户生成或加载本地 RSA 密钥对。
+   - 私钥仅保存在浏览器本地 `localStorage`，不上传到服务端。
+   - 公钥通过 `PUT /api/users/me/public-key` 接口上传到服务端，用于被好友发送消息时加密。
+
+2. **聊天初始化**
+   - 用户进入聊天页后，前端先获取好友列表和历史消息。
+   - 好友列表中需包含好友的公钥及公钥算法标识，供发送消息时使用。
+   - 历史消息接口返回的是双份密文数据，不返回消息明文。
+
+3. **消息发送加密**
+   - 用户输入消息明文后，前端对同一条消息执行两次加密：
+     - 使用当前用户自己的公钥加密，生成 `senderCiphertext`；
+     - 使用好友公钥加密，生成 `receiverCiphertext`。
+   - 两份密文分别对应发送方可解密版本与接收方可解密版本。
+   - 前端将 `receiverId`、`senderCiphertext`、`senderAlgorithm`、`receiverCiphertext`、`receiverAlgorithm` 一并提交给后端。
+
+4. **服务端保存与转发**
+   - 后端仅校验请求参数完整性与算法合法性，当前支持的算法标识为 `rsa-oaep-sha256`。
+   - 后端不会解密消息，也不会保存明文内容。
+   - 后端将双份密文保存到消息表中，并在接收方在线时通过 WebSocket 推送该消息。
+
+5. **消息展示与本地解密**
+   - 前端展示消息时，根据当前登录用户身份选择对应密文：
+     - 当前用户是发送方时，使用 `senderCiphertext` 解密；
+     - 当前用户是接收方时，使用 `receiverCiphertext` 解密。
+   - 解密操作全部在前端本地完成，解密成功后显示消息明文。
+
+6. **异常处理**
+   - 若本地私钥丢失、损坏或解密失败，前端不得向服务端请求明文兜底。
+   - 此类情况下，消息界面统一显示占位文案 `***（已加密）`，以表明该消息已加密但当前设备无法解密查看。
+
+tips
+1. 场景说明：当用户用一台新设备（新浏览器）登录后，历史的消息会被加密，严格防止了账号被盗用后的消息泄密；同样，换个新设备发送的消息，用原来的老设备也同样看不到历史的消息。
 
 ---
 

@@ -68,6 +68,21 @@ func (r *GormUserRepository) UpdateProfile(userID uint64, nickname string, gende
 	return r.FindByID(userID)
 }
 
+func (r *GormUserRepository) UpdatePublicKey(userID uint64, publicKey string, algorithm string) (*model.User, error) {
+	updates := map[string]interface{}{
+		"public_key":           publicKey,
+		"public_key_algorithm": algorithm,
+	}
+	result := r.db.Model(&model.User{}).Where("id = ?", userID).Updates(updates)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, ErrUserNotFound
+	}
+	return r.FindByID(userID)
+}
+
 func isDuplicateKeyError(err error) bool {
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return true

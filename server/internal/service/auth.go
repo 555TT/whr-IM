@@ -15,6 +15,9 @@ import (
 const defaultAvatar = "https://api.dicebear.com/7.x/initials/svg?seed=default-user"
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
+var ErrInvalidPublicKey = errors.New("invalid public key update")
+
+const supportedPublicKeyAlgorithm = "rsa-oaep-sha256"
 
 const minUsernameLength = 4
 const maxUsernameLength = 20
@@ -42,6 +45,11 @@ type UpdateProfileInput struct {
 	Signature string
 }
 
+type UpdatePublicKeyInput struct {
+	PublicKey string
+	Algorithm string
+}
+
 func (s *AuthService) Register(input RegisterInput) (*model.User, error) {
 	if err := validateCredentials(input.Username, input.Password); err != nil {
 		return nil, err
@@ -56,12 +64,14 @@ func (s *AuthService) Register(input RegisterInput) (*model.User, error) {
 	}
 
 	user := &model.User{
-		Username:     input.Username,
-		PasswordHash: string(hash),
-		Nickname:     input.Username,
-		Avatar:       defaultAvatar,
-		Gender:       0,
-		Signature:    "",
+		Username:           input.Username,
+		PasswordHash:       string(hash),
+		Nickname:           input.Username,
+		Avatar:             defaultAvatar,
+		Gender:             0,
+		Signature:          "",
+		PublicKey:          "",
+		PublicKeyAlgorithm: "",
 	}
 
 	if err := s.repo.Create(user); err != nil {
@@ -124,6 +134,20 @@ func (s *AuthService) GetProfile(userID uint64) (*model.User, error) {
 
 func (s *AuthService) UpdateProfile(userID uint64, input UpdateProfileInput) (*model.User, error) {
 	return s.repo.UpdateProfile(userID, input.Nickname, input.Gender, input.Signature)
+}
+
+func (s *AuthService) UpdatePublicKey(userID uint64, input UpdatePublicKeyInput) (*model.User, error) {
+	if input.PublicKey == "" {
+		return nil, fmt.Errorf("%w: publicKey is required", ErrInvalidPublicKey)
+	}
+	if input.Algorithm == "" {
+		return nil, fmt.Errorf("%w: algorithm is required", ErrInvalidPublicKey)
+	}
+	if input.Algorithm != supportedPublicKeyAlgorithm {
+		return nil, fmt.Errorf("%w: unsupported algorithm %q", ErrInvalidPublicKey, input.Algorithm)
+	}
+
+	return s.repo.UpdatePublicKey(userID, input.PublicKey, input.Algorithm)
 }
 
 func validateCredentials(username, password string) error {

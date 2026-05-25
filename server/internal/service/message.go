@@ -8,6 +8,8 @@ import (
 	"whr-im/server/internal/ws"
 )
 
+const supportedMessageAlgorithm = "rsa-oaep-sha256"
+
 type MessageService struct {
 	messageRepo repository.MessageRepository
 	friendRepo  repository.FriendRepository
@@ -19,8 +21,11 @@ func NewMessageService(messageRepo repository.MessageRepository, friendRepo repo
 }
 
 type CreateMessageInput struct {
-	ReceiverID uint64
-	Content    string
+	ReceiverID         uint64
+	SenderCiphertext   string
+	SenderAlgorithm    string
+	ReceiverCiphertext string
+	ReceiverAlgorithm  string
 }
 
 func (s *MessageService) Create(userID uint64, input CreateMessageInput) (*model.Message, error) {
@@ -38,7 +43,23 @@ func (s *MessageService) Create(userID uint64, input CreateMessageInput) (*model
 	if !isFriend {
 		return nil, fmt.Errorf("non-friend users cannot chat")
 	}
-	message := &model.Message{SenderID: userID, ReceiverID: input.ReceiverID, Content: input.Content, MsgType: "text"}
+	if input.SenderCiphertext == "" || input.ReceiverCiphertext == "" {
+		return nil, fmt.Errorf("ciphertext is required")
+	}
+	if input.SenderAlgorithm == "" || input.ReceiverAlgorithm == "" {
+		return nil, fmt.Errorf("algorithm is required")
+	}
+	if input.SenderAlgorithm != supportedMessageAlgorithm || input.ReceiverAlgorithm != supportedMessageAlgorithm {
+		return nil, fmt.Errorf("unsupported algorithm")
+	}
+	message := &model.Message{
+		SenderID:           userID,
+		ReceiverID:         input.ReceiverID,
+		SenderCiphertext:   input.SenderCiphertext,
+		SenderAlgorithm:    input.SenderAlgorithm,
+		ReceiverCiphertext: input.ReceiverCiphertext,
+		ReceiverAlgorithm:  input.ReceiverAlgorithm,
+	}
 	if err := s.messageRepo.Create(message); err != nil {
 		return nil, err
 	}
