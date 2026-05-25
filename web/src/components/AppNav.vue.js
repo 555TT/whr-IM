@@ -15,6 +15,13 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav']} */ ;
+/** @type {__VLS_StyleScopedClasses['nav-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['nav']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand']} */ ;
+/** @type {__VLS_StyleScopedClasses['nav-links']} */ ;
+/** @type {__VLS_StyleScopedClasses['nav']} */ ;
+/** @type {__VLS_StyleScopedClasses['nav-user-name']} */ ;
+/** @type {__VLS_StyleScopedClasses['logout-btn']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({

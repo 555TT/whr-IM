@@ -52,6 +52,7 @@ const messages = ref<RenderMessage[]>([])
 const currentFriendId = ref<number | null>(null)
 const draft = ref('')
 const errorMessage = ref('')
+const cryptoReady = ref(true) // 端到端加密是否就绪，未就绪时禁用发送
 const socketConnected = ref(false)
 const sending = ref(false)
 const privateKey = ref<CryptoKey | null>(null)
@@ -260,10 +261,27 @@ watch(messages, () => {
   scrollToBottom()
 }, { deep: true })
 
+function backToList() {
+  currentFriendId.value = null
+}
+
 onMounted(async () => {
   try {
     await authStore.bootstrap()
+  } catch (error) {
+    errorMessage.value = (error as Error).message
+    return
+  }
+
+  // 加密初始化失败不应阻断好友列表与历史消息的展示，因此独立 try
+  try {
     await ensureOwnKeyPair()
+  } catch (error) {
+    cryptoReady.value = false
+    errorMessage.value = (error as Error).message
+  }
+
+  try {
     await loadFriends()
     connectSocket()
   } catch (error) {
@@ -279,7 +297,10 @@ onBeforeUnmount(() => {
 <template>
   <div class="page-shell apple-page">
     <AppNav />
-    <section class="chat-shell card">
+    <section
+      class="chat-shell card"
+      :class="{ 'mobile-show-chat': currentFriendId !== null }"
+    >
       <aside class="sidebar">
         <div class="sidebar-top">
           <div>
@@ -306,14 +327,18 @@ onBeforeUnmount(() => {
 
       <section class="chat-panel">
         <div class="chat-top">
-          <div>
+          <button class="back-btn" type="button" @click="backToList" aria-label="返回好友列表">‹</button>
+          <div class="chat-top-main">
             <p class="apple-label">Conversation</p>
             <h2>{{ currentFriend ? currentFriend.nickname : '聊天窗口' }}</h2>
             <small class="muted" v-if="authStore.user">当前身份：{{ authStore.user.nickname || authStore.user.username }}</small>
           </div>
-          <button class="apple-button secondary" @click="loadFriends">刷新好友</button>
+          <button class="apple-button secondary refresh-btn" @click="loadFriends">刷新好友</button>
         </div>
         <p v-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
+        <p v-if="!cryptoReady && !errorMessage" class="status-text error">
+          当前环境不支持端到端加密，仅可查看已有会话。
+        </p>
         <div v-if="!currentFriendId" class="empty-state">请选择一个好友开始聊天</div>
         <div v-else ref="messageListRef" class="messages">
           <div
@@ -335,11 +360,15 @@ onBeforeUnmount(() => {
           <input
             v-model="draft"
             class="apple-input"
-            :disabled="!currentFriendId || sending"
-            placeholder="输入消息"
+            :disabled="!currentFriendId || sending || !cryptoReady"
+            :placeholder="cryptoReady ? '输入消息' : '当前环境不支持发送加密消息'"
             @keyup.enter="sendMessage"
           />
-          <button class="apple-button" :disabled="!currentFriendId || sending" @click="sendMessage">
+          <button
+            class="apple-button"
+            :disabled="!currentFriendId || sending || !cryptoReady"
+            @click="sendMessage"
+          >
             {{ sending ? '发送中...' : '发送' }}
           </button>
         </div>
@@ -485,6 +514,11 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+/* 桌面端默认隐藏移动端独有的返回按钮 */
+.back-btn {
+  display: none;
+}
+
 @media (max-width: 980px) {
   .chat-shell {
     grid-template-columns: 1fr;
@@ -493,6 +527,112 @@ onBeforeUnmount(() => {
   .sidebar {
     border-right: none;
     border-bottom: 1px solid rgba(29, 29, 31, 0.08);
+  }
+}
+
+/* ≤768px：手机端走"列表/对话切换"模式 */
+@media (max-width: 768px) {
+  .chat-shell {
+    min-height: 0;
+    display: block; /* 不再 grid，由可见性切换决定显示哪一栏 */
+    overflow: visible;
+  }
+
+  .sidebar {
+    padding: 18px 14px;
+    border-bottom: none;
+  }
+
+  .chat-panel {
+    display: none;
+    padding: 16px 14px calc(16px + env(safe-area-inset-bottom));
+    min-height: calc(100vh - 140px);
+  }
+
+  /* 选中好友后：隐藏列表、显示对话 */
+  .chat-shell.mobile-show-chat .sidebar {
+    display: none;
+  }
+  .chat-shell.mobile-show-chat .chat-panel {
+    display: flex;
+  }
+
+  .sidebar-top h2,
+  .chat-top h2 {
+    font-size: 22px;
+    margin-top: 2px;
+  }
+
+  .chat-top {
+    align-items: center;
+    gap: 10px;
+  }
+
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(29, 29, 31, 0.06);
+    color: #1d1d1f;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .chat-top-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .refresh-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .messages {
+    min-height: 0;
+    max-height: none;
+    flex: 1;
+  }
+
+  .message-item {
+    max-width: 82%;
+    padding: 12px 14px;
+    border-radius: 18px;
+  }
+
+  .friend-item {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .composer {
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    position: sticky;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding-top: 8px;
+    margin: 0 -14px -16px;
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .composer .apple-input {
+    padding: 12px 14px;
+    border-radius: 14px;
+  }
+
+  .composer .apple-button {
+    padding: 12px 16px;
   }
 }
 </style>

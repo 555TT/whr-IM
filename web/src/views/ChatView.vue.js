@@ -11,6 +11,7 @@ const messages = ref([]);
 const currentFriendId = ref(null);
 const draft = ref('');
 const errorMessage = ref('');
+const cryptoReady = ref(true); // 端到端加密是否就绪，未就绪时禁用发送
 const socketConnected = ref(false);
 const sending = ref(false);
 const privateKey = ref(null);
@@ -189,10 +190,26 @@ async function scrollToBottom() {
 watch(messages, () => {
     scrollToBottom();
 }, { deep: true });
+function backToList() {
+    currentFriendId.value = null;
+}
 onMounted(async () => {
     try {
         await authStore.bootstrap();
+    }
+    catch (error) {
+        errorMessage.value = error.message;
+        return;
+    }
+    // 加密初始化失败不应阻断好友列表与历史消息的展示，因此独立 try
+    try {
         await ensureOwnKeyPair();
+    }
+    catch (error) {
+        cryptoReady.value = false;
+        errorMessage.value = error.message;
+    }
+    try {
         await loadFriends();
         connectSocket();
     }
@@ -221,6 +238,24 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['message-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['sidebar']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['sidebar']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['mobile-show-chat']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['sidebar-top']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-top']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-top']} */ ;
+/** @type {__VLS_StyleScopedClasses['back-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['messages']} */ ;
+/** @type {__VLS_StyleScopedClasses['message-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['friend-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -232,6 +267,7 @@ const __VLS_0 = __VLS_asFunctionalComponent(AppNav, new AppNav({}));
 const __VLS_1 = __VLS_0({}, ...__VLS_functionalComponentArgsRest(__VLS_0));
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
     ...{ class: "chat-shell card" },
+    ...{ class: ({ 'mobile-show-chat': __VLS_ctx.currentFriendId !== null }) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements.aside)({
     ...{ class: "sidebar" },
@@ -280,7 +316,15 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElemen
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "chat-top" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.backToList) },
+    ...{ class: "back-btn" },
+    type: "button",
+    'aria-label': "返回好友列表",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "chat-top-main" },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
     ...{ class: "apple-label" },
 });
@@ -294,13 +338,18 @@ if (__VLS_ctx.authStore.user) {
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.loadFriends) },
-    ...{ class: "apple-button secondary" },
+    ...{ class: "apple-button secondary refresh-btn" },
 });
 if (__VLS_ctx.errorMessage) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
         ...{ class: "status-text error" },
     });
     (__VLS_ctx.errorMessage);
+}
+if (!__VLS_ctx.cryptoReady && !__VLS_ctx.errorMessage) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "status-text error" },
+    });
 }
 if (!__VLS_ctx.currentFriendId) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -341,14 +390,14 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     ...{ onKeyup: (__VLS_ctx.sendMessage) },
     ...{ class: "apple-input" },
-    disabled: (!__VLS_ctx.currentFriendId || __VLS_ctx.sending),
-    placeholder: "输入消息",
+    disabled: (!__VLS_ctx.currentFriendId || __VLS_ctx.sending || !__VLS_ctx.cryptoReady),
+    placeholder: (__VLS_ctx.cryptoReady ? '输入消息' : '当前环境不支持发送加密消息'),
 });
 (__VLS_ctx.draft);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.sendMessage) },
     ...{ class: "apple-button" },
-    disabled: (!__VLS_ctx.currentFriendId || __VLS_ctx.sending),
+    disabled: (!__VLS_ctx.currentFriendId || __VLS_ctx.sending || !__VLS_ctx.cryptoReady),
 });
 (__VLS_ctx.sending ? '发送中...' : '发送');
 /** @type {__VLS_StyleScopedClasses['page-shell']} */ ;
@@ -365,10 +414,15 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
 /** @type {__VLS_StyleScopedClasses['friend-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-top']} */ ;
+/** @type {__VLS_StyleScopedClasses['back-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-top-main']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['muted']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
 /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['refresh-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['error']} */ ;
 /** @type {__VLS_StyleScopedClasses['status-text']} */ ;
 /** @type {__VLS_StyleScopedClasses['error']} */ ;
 /** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
@@ -391,6 +445,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             currentFriendId: currentFriendId,
             draft: draft,
             errorMessage: errorMessage,
+            cryptoReady: cryptoReady,
             socketConnected: socketConnected,
             sending: sending,
             messageListRef: messageListRef,
@@ -399,6 +454,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             selectFriend: selectFriend,
             sendMessage: sendMessage,
             isMine: isMine,
+            backToList: backToList,
         };
     },
 });

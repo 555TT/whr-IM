@@ -2,6 +2,23 @@ const ALGORITHM = 'RSA-OAEP'
 const HASH = 'SHA-256'
 export const E2EE_MESSAGE_ALGORITHM = 'rsa-oaep-sha256'
 
+// 浏览器只在 secure context（HTTPS 或 localhost）下暴露 window.crypto.subtle，
+// 否则取到的会是 undefined。手机通过 http://电脑IP:端口 访问是典型的踩坑场景。
+// 在任何加解密入口被调用之前先抛友好错误，避免出现 "Cannot read properties of
+// undefined (reading 'generateKey')" 这种泄漏到 UI 的程序员级报错。
+function ensureSubtleAvailable() {
+  if (typeof window === 'undefined') return
+  const subtle = window.crypto?.subtle
+  if (subtle) return
+  if (window.isSecureContext === false) {
+    throw new Error(
+      '当前页面不是安全上下文（非 HTTPS / 非 localhost），浏览器禁用了加密 API。' +
+        '请使用 https:// 或 localhost 访问。'
+    )
+  }
+  throw new Error('当前浏览器不支持 Web Crypto API，请更换为较新的浏览器。')
+}
+
 export type EncryptedPayload = {
   ciphertext?: string
   algorithm?: string
@@ -70,6 +87,7 @@ function base64ToArrayBuffer(value: string) {
 }
 
 export async function generateKeyPair() {
+  ensureSubtleAvailable()
   return window.crypto.subtle.generateKey(
     {
       name: ALGORITHM,
@@ -93,6 +111,7 @@ export async function exportPrivateKey(privateKey: CryptoKey) {
 }
 
 export async function importPublicKey(serializedKey: string) {
+  ensureSubtleAvailable()
   return window.crypto.subtle.importKey(
     'spki',
     base64ToArrayBuffer(serializedKey),
@@ -103,6 +122,7 @@ export async function importPublicKey(serializedKey: string) {
 }
 
 export async function importPrivateKey(serializedKey: string) {
+  ensureSubtleAvailable()
   return window.crypto.subtle.importKey(
     'pkcs8',
     base64ToArrayBuffer(serializedKey),
