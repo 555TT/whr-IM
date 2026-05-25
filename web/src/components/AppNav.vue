@@ -108,4 +108,41 @@ function logout() {
   color: #1d1d1f;
   cursor: pointer;
 }
+
+@media (max-width: 768px) {
+  .nav-wrap {
+    margin-bottom: 16px;
+  }
+  .nav {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .brand {
+    font-size: 15px;
+  }
+  .nav-links {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .nav a {
+    padding: 8px 10px;
+    font-size: 14px;
+    flex: 1;
+    text-align: center;
+  }
+  .nav-user-name {
+    font-size: 12px;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .logout-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
 </style>

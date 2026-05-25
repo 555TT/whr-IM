@@ -53,6 +53,17 @@ a {
   max-width: 1200px;
   margin: 0 auto;
   padding: 32px 24px 48px;
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
+}
+
+@media (max-width: 768px) {
+  .apple-page {
+    padding: 16px 12px calc(20px + env(safe-area-inset-bottom));
+  }
+  .card {
+    border-radius: 20px;
+  }
 }
 
 .apple-panel {
@@ -125,6 +136,13 @@ a {
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+/* 触控设备上不要悬停态把按钮顶上去，避免点完一下后按钮位置错乱 */
+@media (hover: none) {
+  .apple-button:hover {
+    transform: none;
+  }
 }
 
 .apple-button.secondary {
