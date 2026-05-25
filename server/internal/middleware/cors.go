@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -11,18 +10,19 @@ func isAllowedOrigin(origin string) bool {
 	if origin == "" {
 		return false
 	}
-
-	parsed, err := url.Parse(origin)
-	if err != nil {
-		return false
-	}
-
-	if parsed.Scheme != "http" {
-		return false
-	}
-
-	hostname := parsed.Hostname()
-	return hostname == "127.0.0.1" || hostname == "localhost"
+	//
+	//parsed, err := url.Parse(origin)
+	//if err != nil {
+	//	return false
+	//}
+	//
+	//if parsed.Scheme != "http" {
+	//	return false
+	//}
+	//
+	//hostname := parsed.Hostname()
+	//return hostname == "127.0.0.1" || hostname == "localhost"
+	return true
 }
 
 func CORS() gin.HandlerFunc {
