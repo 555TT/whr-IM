@@ -59,11 +59,11 @@ def write_front(doc):
     add_para(doc, f'题目：{PAPER_TITLE}', size=14, bold=True, indent_first=False, line_spacing=1.0)
     add_para(doc, '专业：软件工程22-0X    学号：5421220XXXX    姓名：王浩然', size=14, bold=True, indent_first=False, line_spacing=1.0)
     add_para(doc, '主要内容：', size=14, bold=True, indent_first=False, line_spacing=1.0)
-    add_para(doc, '本课题设计并实现一套基于前后端分离架构的即时通讯系统，前端采用 Vue 3 + Vite + TypeScript 构建，'
-                  '后端采用 Go 语言 + Gin 框架 + GORM + MySQL 实现。系统应支持用户注册登录、个人资料维护、'
-                  '好友申请与管理、基于 WebSocket 的实时聊天以及历史消息查询等核心功能。'
-                  '在此基础上，重点研究并实现基于 RSA-OAEP 非对称加密算法的端到端消息加密机制，'
-                  '使聊天消息在用户浏览器中完成加密后再传至服务端，服务端只保存与转发密文，从而提升即时通讯系统中消息内容的安全性。',
+    add_para(doc, '本课题围绕一套前后端分离的即时通讯系统展开。前端使用 Vue 3、Vite 与 TypeScript，'
+                  '后端采用 Go、Gin、GORM 和 MySQL，先把注册登录、个人资料维护、好友申请与管理、'
+                  '基于 WebSocket 的实时聊天以及历史消息查询这些基础功能跑通。真正要解决的问题，'
+                  '是怎样把 RSA-OAEP 端到端消息加密机制落到浏览器侧：消息先在用户本地完成加密，再上传到服务端，'
+                  '服务端只负责保存和转发密文，从而尽量压缩消息明文暴露面。',
              indent_first=True, line_spacing=1.5)
     add_para(doc, '基本要求：', size=14, bold=True, indent_first=False, line_spacing=1.0)
     add_para(doc, '（1）熟悉前后端分离的开发模式，能够独立完成前端工程与后端工程的搭建与联调；', line_spacing=1.5)
@@ -89,22 +89,19 @@ def write_front(doc):
     # ========== 中文摘要 ==========
     add_centered(doc, '摘  要', size=15, bold=False, cn='宋体')
     add_blank_line(doc)
-    add_para(doc, '即时通讯系统已成为互联网应用中的基础设施，但传统方案大多停留在“传输层加密 + 服务端明文存储”这一层面。'
-                  '该模式能够保护消息在网络链路中的安全，却无法消除服务端集中持有明文所带来的泄露风险。'
-                  '围绕这一问题，本文设计并实现了一套基于 Gin 和 WebSocket 的 IM 即时通讯系统，'
-                  '在完成用户认证、好友关系维护、实时聊天、历史消息查询等基础功能的同时，'
-                  '将研究重点放在端到端消息加密机制的工程落地上。')
-    add_para(doc, '系统前端采用 Vue 3、Vite、TypeScript 与 Pinia 构建，后端采用 Go 1.22、Gin、GORM 与 MySQL 实现，'
-                  '并通过 Gorilla WebSocket 建立长连接以承担实时消息下行。在安全实现上，'
-                  '本文采用 RSA-OAEP 非对称加密算法与浏览器原生 Web Crypto API，由前端在本地生成密钥对，'
-                  '私钥仅保存在浏览器环境中，公钥上传服务端。发送消息时，前端分别使用发送方公钥和接收方公钥'
-                  '对同一条明文加密，形成两份独立密文；服务端仅负责密文的校验、存储与转发，'
-                  '从而在不破坏聊天历史可读性的前提下，将消息明文排除在服务端存储边界之外。')
-    add_para(doc, '测试结果表明，系统在注册登录、好友管理、实时聊天、历史消息查询、消息加密等核心场景下'
-                  '均能稳定运行，12 项功能测试全部通过。对网络请求与数据库内容的观测显示，服务端链路中未出现'
-                  '明文消息泄露。本文实现的方案具备端到端加密的基本特征，能够满足毕业设计场景下对工程完整性、'
-                  '通信实时性与消息安全性的综合要求。与此同时，文中也对公钥真实性校验、前向保密、会话密钥协商'
-                  '与多设备同步等尚未覆盖的问题进行了边界分析，为后续向工业级 E2EE 体系演进提供了清晰方向。')
+    add_para(doc, '聊天软件大多会用 TLS 把消息在传输路上保护好，但一进服务端，几乎都还是明文。数据库一旦泄露，'
+                  '泄出去的就是完整的聊天记录——这件事在过去几年的安全事故里反复出现过。本文从这个具体缺口入手，'
+                  '搭了一套前后端分离的 IM 系统，框架选了 Gin 加 WebSocket。注册登录、好友、实时聊天、历史消息这些功能'
+                  '都按常规做法跑通，重点反而是把端到端加密真正塞进业务链路里——而不是当成额外的"加密会话"挂在一旁。')
+    add_para(doc, '前端用的是 Vue 3，加上 Vite、TypeScript 和 Pinia；后端走 Go 1.22 配合 Gin、GORM、MySQL，'
+                  '实时下行交给 Gorilla WebSocket 维护长连接。最花精力的还是加密这一块。算法选了 RSA-OAEP，配合浏览器自带的'
+                  ' Web Crypto API——密钥对在浏览器里生成，私钥从不出本机，传到服务端的只有公钥。每发出一条消息，'
+                  '前端会在本地做两次加密：一次用对方公钥，一次用自己的公钥。服务端拿到的只是两份密文，做的事也就剩校验、'
+                  '入库和转发。聊天历史在两边设备上都还能读，但服务端从头到尾看不到明文。')
+    add_para(doc, '功能上准备了 12 项用例，覆盖了登录、好友、聊天、历史消息和加密路径，整套跑下来 12 项全过；同时去抓包、'
+                  '去数据库里翻，也没看到任何漏出来的明文。换个说法：端到端加密最核心的那一条承诺——服务端没法读它转发的消息——'
+                  '在这份实现里是成立的，双方又都能本地回看历史。还有几件事文中没掩盖：公钥真实性还没做校验、暂时没有前向保密、'
+                  '会话密钥协商也没引入、多设备同步同样还没覆盖。这几条就是这套系统要继续往工业级 E2EE 靠近时绕不开的下一步。')
     add_blank_line(doc)
     add_para(doc, '关键词：即时通讯；前后端分离；WebSocket；端到端加密；RSA-OAEP',
              indent_first=False, bold=False, line_spacing=1.5)
@@ -117,27 +114,30 @@ def write_front(doc):
     add_centered(doc, 'ABSTRACT', size=14, bold=True, cn='Times New Roman')
     add_blank_line(doc)
     add_blank_line(doc)
-    add_para(doc, 'Instant messaging (IM) has become one of the most important application forms in the Internet era, '
-                  'and is widely used in social communication, office collaboration and online cooperation scenarios. '
-                  'As users pay more and more attention to the privacy of their messages, how to provide effective '
-                  'content encryption protection in a general-purpose IM system has become an important research and '
-                  'engineering topic. This paper designs and implements an instant messaging system based on Gin and '
-                  'WebSocket, and focuses on the engineering implementation of end-to-end message encryption while '
-                  'retaining basic functions such as authentication, friend management, real-time chat and historical '
-                  'message query.', en='Times New Roman', cn='Times New Roman')
-    add_para(doc, 'The front-end of the system is built on Vue 3, Vite, TypeScript and Pinia, while the back-end is '
-                  'implemented with Go 1.22, Gin, GORM and MySQL. Real-time message delivery is supported by Gorilla '
-                  'WebSocket. In the security design, RSA-OAEP and the browser-native Web Crypto API are adopted. Key '
-                  'pairs are generated locally in the browser, private keys are kept on the client side only, and public '
-                  'keys are uploaded to the server. For each outgoing message, the plaintext is encrypted twice with the '
-                  'sender\'s public key and the receiver\'s public key respectively, so that the server stores and forwards '
-                  'ciphertext only while both communication parties can decrypt their own copies locally.', en='Times New Roman', cn='Times New Roman')
-    add_para(doc, 'Experimental and functional verification results show that all 12 core test cases pass successfully, '
-                  'and no plaintext message is exposed in the server-side storage or network payloads. The proposed '
-                  'scheme exhibits the basic characteristics of end-to-end encryption and is suitable for an undergraduate '
-                  'engineering project. At the same time, the limitations in public key authenticity verification, forward '
-                  'secrecy, session key negotiation and multi-device synchronization are explicitly discussed, providing a '
-                  'clear direction for future evolution toward a full industrial-grade E2EE system.', en='Times New Roman', cn='Times New Roman')
+    add_para(doc, 'Most IM systems today rely on TLS to protect messages in transit, yet leave them in plaintext once '
+                  'they hit the database. A single server breach is enough to expose every conversation that ever passed '
+                  'through. This thesis takes that gap as its starting point. It builds a front-end / back-end separated '
+                  'IM system on top of Gin and WebSocket, and pushes the security boundary all the way into the browser: '
+                  'messages are encrypted before they leave the sender\'s machine, so what the server sees and stores is '
+                  'only ciphertext. Authentication, friend management, real-time chat and message history are still '
+                  'there, but the real focus is making end-to-end encryption work inside an ordinary web stack rather '
+                  'than as a separate "secure mode".', en='Times New Roman', cn='Times New Roman')
+    add_para(doc, 'On the front-end side the stack is Vue 3 with Vite, TypeScript and Pinia; on the back-end it is Go '
+                  '1.22 plus Gin, GORM and MySQL, with Gorilla WebSocket handling the real-time push. The encryption '
+                  'piece is the part that took the most thought. RSA-OAEP was chosen together with the browser-native '
+                  'Web Crypto API — key pairs are generated in the browser, the private key never leaves it, and only '
+                  'the public key gets uploaded. When a message is sent, the plaintext is encrypted twice in the '
+                  'browser, once under the sender\'s own public key and once under the receiver\'s. The server only ever '
+                  'touches ciphertext, but because both sides keep a copy they can decrypt, history remains readable on '
+                  'either device.', en='Times New Roman', cn='Times New Roman')
+    add_para(doc, 'Twelve functional cases were run end to end, covering login, friends, chat, history and the '
+                  'encryption path itself. All twelve passed, and neither packet captures nor a direct look at the '
+                  'database turned up any leftover plaintext. Put differently: the most important promise of end-to-end '
+                  'encryption — that the server cannot read the messages it forwards — does hold in this build, while '
+                  'both parties can still re-read their history locally. A few problems are left open and stated '
+                  'plainly: public key authenticity is not yet verified, there is no forward secrecy, no session key '
+                  'negotiation, and no multi-device sync. They are the obvious next steps if anyone wants to push this '
+                  'design closer to an industrial-grade E2EE system.', en='Times New Roman', cn='Times New Roman')
     add_blank_line(doc)
     add_para(doc, 'KEY WORDS: Instant Messaging; Front-end and Back-end Separation; WebSocket; End-to-End Encryption; RSA-OAEP',
              indent_first=False, bold=True, line_spacing=1.5, en='Times New Roman', cn='Times New Roman')
