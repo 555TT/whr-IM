@@ -69,6 +69,8 @@ func NewWithRepositories(
 	authService := service.NewAuthService(userRepo, "dev-secret")
 	authHandler := handler.NewAuthUserHandler(authService)
 	wsHandler := handler.NewWebSocketHandler(authService, hub)
+	uploadService := service.NewUploadService(service.NewStaticObjectStorage("http://localhost:9000"))
+	uploadHandler := handler.NewUploadHandler(uploadService)
 
 	r.GET("/ws", wsHandler.Connect)
 
@@ -81,6 +83,7 @@ func NewWithRepositories(
 	authed.GET("/users/me", authHandler.Me)
 	authed.PUT("/users/me", authHandler.UpdateMe)
 	authed.PUT("/users/me/public-key", authHandler.UpdateMyPublicKey)
+	authed.POST("/uploads/images", uploadHandler.UploadImage)
 
 	if friendRepo != nil {
 		friendService := service.NewFriendService(friendRepo, userRepo)

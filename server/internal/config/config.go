@@ -7,8 +7,9 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig `yaml:"server"`
-	MySQL  MySQLConfig  `yaml:"mysql"`
+	Server        ServerConfig        `yaml:"server"`
+	MySQL         MySQLConfig         `yaml:"mysql"`
+	ObjectStorage ObjectStorageConfig `yaml:"objectStorage"`
 }
 
 type ServerConfig struct {
@@ -17,6 +18,10 @@ type ServerConfig struct {
 
 type MySQLConfig struct {
 	DSN string `yaml:"dsn"`
+}
+
+type ObjectStorageConfig struct {
+	PublicBaseURL string `yaml:"publicBaseUrl"`
 }
 
 func Load(path string) (*Config, error) {
