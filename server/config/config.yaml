@@ -1,11 +1,11 @@
 server:
   port: ":8080"
 mysql:
-  dsn: "root:wanghaoran666@tcp(localhost:3306)/whr_im?charset=utf8mb4&parseTime=True&loc=Local"
+  dsn: "mysql-dsn-from-env-or-local-config"
 objectStorage:
-  endpoint: "121.41.66.206:9000"
-  accessKey: "minioadmin"
-  secretKey: "minioadmin123"
+  endpoint: "minio-endpoint-from-env-or-local-config"
+  accessKey: "minio-access-key-from-env-or-local-config"
+  secretKey: "minio-secret-key-from-env-or-local-config"
   bucket: "whr-im"
   useSSL: false
-  publicBaseUrl: "http://121.41.66.206:9000/whr-im"
+  publicBaseUrl: "http://minio.example.com/whr-im"
