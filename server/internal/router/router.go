@@ -38,15 +38,29 @@ func New(cfg *config.Config) *gin.Engine {
 	if err != nil {
 		log.Fatal(err)
 	}
+	groupRepo, err := repository.NewGormGroupRepository(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+	groupMessageRepo, err := repository.NewGormGroupMessageRepository(db)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	return NewWithRepositories(userRepo, friendRepo, messageRepo)
+	return NewWithRepositories(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo)
 }
 
 func NewWithUserRepository(userRepo repository.UserRepository) *gin.Engine {
-	return NewWithRepositories(userRepo, nil, nil)
+	return NewWithRepositories(userRepo, nil, nil, nil, nil)
 }
 
-func NewWithRepositories(userRepo repository.UserRepository, friendRepo repository.FriendRepository, messageRepo repository.MessageRepository) *gin.Engine {
+func NewWithRepositories(
+	userRepo repository.UserRepository,
+	friendRepo repository.FriendRepository,
+	messageRepo repository.MessageRepository,
+	groupRepo repository.GroupRepository,
+	groupMessageRepo repository.GroupMessageRepository,
+) *gin.Engine {
 	r := gin.Default()
 	r.Use(middleware.CORS())
 	r.GET("/health", handler.Health)
@@ -82,6 +96,22 @@ func NewWithRepositories(userRepo repository.UserRepository, friendRepo reposito
 			messageHandler := handler.NewMessageHandler(messageService)
 			authed.POST("/messages", messageHandler.Create)
 			authed.GET("/messages", messageHandler.List)
+		}
+
+		if groupRepo != nil && groupMessageRepo != nil {
+			groupService := service.NewGroupService(groupRepo, friendRepo, userRepo)
+			groupMessageService := service.NewGroupMessageService(groupMessageRepo, groupRepo, hub)
+			groupHandler := handler.NewGroupHandler(groupService)
+			groupMessageHandler := handler.NewGroupMessageHandler(groupMessageService)
+
+			groups := authed.Group("/groups")
+			groups.POST("", groupHandler.Create)
+			groups.GET("", groupHandler.ListMine)
+			groups.GET("/:id", groupHandler.Detail)
+			groups.POST("/:id/members", groupHandler.AddMembers)
+			groups.DELETE("/:id/members/me", groupHandler.LeaveGroup)
+			groups.POST("/:id/messages", groupMessageHandler.Create)
+			groups.GET("/:id/messages", groupMessageHandler.List)
 		}
 	}
 

@@ -1,6 +1,10 @@
 CREATE DATABASE IF NOT EXISTS whr_im DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE whr_im;
 
+DROP TABLE IF EXISTS group_message_keys;
+DROP TABLE IF EXISTS group_messages;
+DROP TABLE IF EXISTS group_members;
+DROP TABLE IF EXISTS chat_groups;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS friends;
 DROP TABLE IF EXISTS friend_requests;
@@ -50,6 +54,56 @@ CREATE TABLE friends (
     CONSTRAINT fk_friends_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_friends_friend FOREIGN KEY (friend_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='好友关系表';
+
+CREATE TABLE chat_groups (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    name VARCHAR(50) NOT NULL COMMENT '群名',
+    owner_id BIGINT UNSIGNED NOT NULL COMMENT '创建者 ID',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    KEY idx_chat_groups_owner (owner_id),
+    CONSTRAINT fk_chat_groups_owner FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='聊天群组表';
+
+CREATE TABLE group_members (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    group_id BIGINT UNSIGNED NOT NULL COMMENT '群 ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '成员 ID',
+    joined_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '入群时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_group_members_group_user (group_id, user_id),
+    KEY idx_group_members_user (user_id),
+    CONSTRAINT fk_group_members_group FOREIGN KEY (group_id) REFERENCES chat_groups (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_group_members_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='群成员关系表';
+
+CREATE TABLE group_messages (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    group_id BIGINT UNSIGNED NOT NULL COMMENT '群 ID',
+    sender_id BIGINT UNSIGNED NOT NULL COMMENT '发送者 ID',
+    content_ciphertext TEXT NOT NULL COMMENT 'AES-GCM 加密后的消息密文 (base64)',
+    content_iv VARCHAR(64) NOT NULL COMMENT 'AES-GCM IV (base64)',
+    content_algorithm VARCHAR(50) NOT NULL COMMENT '内容加密算法,如 aes-gcm-256',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
+    PRIMARY KEY (id),
+    KEY idx_group_messages_group_created_at (group_id, created_at),
+    KEY idx_group_messages_sender (sender_id),
+    CONSTRAINT fk_group_messages_group FOREIGN KEY (group_id) REFERENCES chat_groups (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_group_messages_sender FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='群聊消息表';
+
+CREATE TABLE group_message_keys (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    message_id BIGINT UNSIGNED NOT NULL COMMENT '群消息 ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '该 AES 密钥密文的接收者',
+    key_ciphertext TEXT NOT NULL COMMENT 'RSA-OAEP 加密的 AES 密钥 (base64)',
+    key_algorithm VARCHAR(50) NOT NULL COMMENT 'AES 密钥包裹算法,如 rsa-oaep-sha256',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_group_message_keys_message_user (message_id, user_id),
+    KEY idx_group_message_keys_user (user_id),
+    CONSTRAINT fk_group_message_keys_message FOREIGN KEY (message_id) REFERENCES group_messages (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_group_message_keys_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='群消息会话密钥包裹表';
 
 CREATE TABLE messages (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',

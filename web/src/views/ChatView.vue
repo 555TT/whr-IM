@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import AppNav from '../components/AppNav.vue'
+import CreateGroupModal from '../components/CreateGroupModal.vue'
+import GroupInfoPanel from '../components/GroupInfoPanel.vue'
 import { http } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { formatChatMessageTime } from '../utils/chat-time'
@@ -19,6 +21,11 @@ import {
   savePrivateKey,
   selectMessagePayloadForUser
 } from '../utils/e2ee'
+import {
+  buildGroupMessageEnvelope,
+  decryptGroupMessage,
+  GROUP_CONTENT_ALGORITHM
+} from '../utils/group-e2ee'
 import { createChatSocket } from '../utils/websocket'
 
 interface FriendItem {
@@ -42,14 +49,67 @@ interface ChatMessage {
   createdAt?: string
 }
 
-interface RenderMessage extends ChatMessage {
-  content: string
+interface GroupListItem {
+  id: number
+  name: string
+  ownerId: number
+  memberCount: number
 }
+
+interface GroupMember {
+  userId: number
+  username: string
+  nickname: string
+  avatar: string
+  publicKey?: string
+  publicKeyAlgorithm?: string
+}
+
+interface GroupDetail {
+  id: number
+  name: string
+  ownerId: number
+  members: GroupMember[]
+}
+
+interface GroupMessage {
+  id: number
+  groupId: number
+  senderId: number
+  contentCiphertext: string
+  contentIv: string
+  contentAlgorithm: string
+  keyCiphertext: string
+  keyAlgorithm: string
+  createdAt?: string
+}
+
+// 渲染层统一形态:文本 + 时间 + 发送者(单聊/群聊都满足)
+interface RenderMessage {
+  id?: number
+  senderId: number
+  // 单聊字段(可选,仅单聊用)
+  receiverId?: number
+  senderCiphertext?: string
+  receiverCiphertext?: string
+  // 群聊字段(可选)
+  groupId?: number
+  // 渲染数据
+  content: string
+  createdAt?: string
+}
+
+type ConversationType = 'friend' | 'group'
 
 const authStore = useAuthStore()
 const friends = ref<FriendItem[]>([])
+const groups = ref<GroupListItem[]>([])
 const messages = ref<RenderMessage[]>([])
+const conversationType = ref<ConversationType | null>(null)
 const currentFriendId = ref<number | null>(null)
+const currentGroupId = ref<number | null>(null)
+const currentGroupDetail = ref<GroupDetail | null>(null)
+const sidebarTab = ref<'friend' | 'group'>('friend')
 const draft = ref('')
 const errorMessage = ref('')
 const cryptoReady = ref(true) // 端到端加密是否就绪，未就绪时禁用发送
@@ -57,9 +117,25 @@ const socketConnected = ref(false)
 const sending = ref(false)
 const privateKey = ref<CryptoKey | null>(null)
 const messageListRef = ref<HTMLElement | null>(null)
+const showCreateGroup = ref(false)
+const showGroupInfo = ref(false)
 let socket: WebSocket | null = null
 
 const currentFriend = computed(() => friends.value.find((item) => item.friendId === currentFriendId.value) || null)
+
+// 当前在聊会话(群或好友)的展示标题
+const conversationTitle = computed(() => {
+  if (conversationType.value === 'friend') return currentFriend.value?.nickname || '聊天窗口'
+  if (conversationType.value === 'group') return currentGroupDetail.value?.name || '群聊'
+  return '聊天窗口'
+})
+
+// 群消息发送者显示名查找
+function groupMemberDisplayName(senderId: number) {
+  if (!currentGroupDetail.value) return String(senderId)
+  const m = currentGroupDetail.value.members.find((mm) => mm.userId === senderId)
+  return m ? m.nickname || m.username : String(senderId)
+}
 
 async function uploadOwnPublicKey(serializedPublicKey: string) {
   await http.put('/users/me/public-key', {
@@ -150,17 +226,14 @@ async function toRenderMessage(message: ChatMessage): Promise<RenderMessage> {
 async function loadFriends() {
   const { data } = await http.get('/friends')
   friends.value = data
-  if (!currentFriendId.value && friends.value.length > 0) {
-    currentFriendId.value = friends.value[0].friendId
-    await loadMessages()
-  }
-  if (currentFriendId.value && !friends.value.some((item) => item.friendId === currentFriendId.value)) {
-    currentFriendId.value = friends.value[0]?.friendId || null
-    await loadMessages()
-  }
 }
 
-async function loadMessages() {
+async function loadGroups() {
+  const { data } = await http.get('/groups')
+  groups.value = data as GroupListItem[]
+}
+
+async function loadFriendMessages() {
   if (!currentFriendId.value) {
     messages.value = []
     return
@@ -170,14 +243,76 @@ async function loadMessages() {
   await scrollToBottom()
 }
 
+async function toGroupRenderMessage(message: GroupMessage): Promise<RenderMessage> {
+  const base: RenderMessage = {
+    id: message.id,
+    senderId: message.senderId,
+    groupId: message.groupId,
+    content: '***（已加密）',
+    createdAt: message.createdAt
+  }
+  if (!privateKey.value) return base
+  try {
+    base.content = await decryptGroupMessage(
+      privateKey.value,
+      message.keyCiphertext,
+      message.contentCiphertext,
+      message.contentIv
+    )
+  } catch {
+    // 保持加密占位
+  }
+  return base
+}
+
+async function loadGroupMessages() {
+  if (!currentGroupId.value) {
+    messages.value = []
+    return
+  }
+  const { data } = await http.get(`/groups/${currentGroupId.value}/messages`)
+  messages.value = await Promise.all((data as GroupMessage[]).map(toGroupRenderMessage))
+  await scrollToBottom()
+}
+
+async function loadGroupDetail(groupId: number) {
+  const { data } = await http.get(`/groups/${groupId}`)
+  currentGroupDetail.value = data as GroupDetail
+}
+
 async function selectFriend(friendId: number) {
+  conversationType.value = 'friend'
   currentFriendId.value = friendId
-  await loadMessages()
+  currentGroupId.value = null
+  currentGroupDetail.value = null
+  await loadFriendMessages()
+}
+
+async function selectGroup(groupId: number) {
+  conversationType.value = 'group'
+  currentGroupId.value = groupId
+  currentFriendId.value = null
+  try {
+    await loadGroupDetail(groupId)
+    await loadGroupMessages()
+  } catch (error) {
+    errorMessage.value = (error as Error).message
+  }
 }
 
 async function sendMessage() {
-  if (!currentFriendId.value || !draft.value.trim() || sending.value) return
+  if (!draft.value.trim() || sending.value) return
   errorMessage.value = ''
+
+  if (conversationType.value === 'friend') {
+    await sendFriendMessage()
+  } else if (conversationType.value === 'group') {
+    await sendGroupMessage()
+  }
+}
+
+async function sendFriendMessage() {
+  if (!currentFriendId.value) return
 
   if (!privateKey.value) {
     errorMessage.value = '当前设备没有可用私钥'
@@ -219,7 +354,85 @@ async function sendMessage() {
   }
 }
 
-function isMine(message: ChatMessage) {
+async function sendGroupMessage() {
+  if (!currentGroupId.value) return
+  if (!privateKey.value) {
+    errorMessage.value = '当前设备没有可用私钥'
+    return
+  }
+
+  // 发消息前刷新一次成员列表,避免缺漏新成员的密钥包裹
+  sending.value = true
+  try {
+    await loadGroupDetail(currentGroupId.value)
+    const detail = currentGroupDetail.value
+    if (!detail) throw new Error('群信息加载失败')
+
+    const members = detail.members.map((m) => ({
+      userId: m.userId,
+      publicKey: m.publicKey || '',
+      publicKeyAlgorithm: m.publicKeyAlgorithm || ''
+    }))
+    const content = draft.value.trim()
+    const envelope = await buildGroupMessageEnvelope(content, members)
+    const { data } = await http.post(`/groups/${currentGroupId.value}/messages`, {
+      contentCiphertext: envelope.contentCiphertext,
+      contentIv: envelope.contentIv,
+      contentAlgorithm: envelope.contentAlgorithm,
+      memberKeys: envelope.memberKeys
+    })
+    messages.value.push(await toGroupRenderMessage(data as GroupMessage))
+    draft.value = ''
+    await scrollToBottom()
+  } catch (error) {
+    errorMessage.value = (error as Error).message
+  } finally {
+    sending.value = false
+  }
+}
+
+async function handleCreateGroup(payload: { name: string; memberIds: number[] }) {
+  errorMessage.value = ''
+  try {
+    const { data } = await http.post('/groups', payload)
+    showCreateGroup.value = false
+    await loadGroups()
+    await selectGroup((data as GroupDetail).id)
+  } catch (error) {
+    errorMessage.value = (error as Error).message
+  }
+}
+
+async function handleInviteMembers(memberIds: number[]) {
+  if (!currentGroupId.value) return
+  errorMessage.value = ''
+  try {
+    const { data } = await http.post(`/groups/${currentGroupId.value}/members`, { memberIds })
+    currentGroupDetail.value = data as GroupDetail
+    showGroupInfo.value = false
+    await loadGroups()
+  } catch (error) {
+    errorMessage.value = (error as Error).message
+  }
+}
+
+async function handleLeaveGroup() {
+  if (!currentGroupId.value) return
+  if (!window.confirm('确认退出该群?退出后将不再收到该群的新消息。')) return
+  try {
+    await http.delete(`/groups/${currentGroupId.value}/members/me`)
+    showGroupInfo.value = false
+    conversationType.value = null
+    currentGroupId.value = null
+    currentGroupDetail.value = null
+    messages.value = []
+    await loadGroups()
+  } catch (error) {
+    errorMessage.value = (error as Error).message
+  }
+}
+
+function isMine(message: { senderId: number }) {
   return message.senderId === authStore.user?.id
 }
 
@@ -240,10 +453,22 @@ function connectSocket() {
     if (payload.type === 'chat_message') {
       const chatMessage = payload.data as ChatMessage
       if (
+        conversationType.value === 'friend' &&
         currentFriendId.value &&
         (chatMessage.senderId === currentFriendId.value || chatMessage.receiverId === currentFriendId.value)
       ) {
         messages.value.push(await toRenderMessage(chatMessage))
+        await scrollToBottom()
+      }
+    } else if (payload.type === 'group_message') {
+      const groupMessage = payload.data as GroupMessage
+      // 自己发的消息已经在 sendGroupMessage 里 push 过,避免重复
+      if (groupMessage.senderId === authStore.user?.id) return
+      if (
+        conversationType.value === 'group' &&
+        currentGroupId.value === groupMessage.groupId
+      ) {
+        messages.value.push(await toGroupRenderMessage(groupMessage))
         await scrollToBottom()
       }
     }
@@ -262,7 +487,11 @@ watch(messages, () => {
 }, { deep: true })
 
 function backToList() {
+  conversationType.value = null
   currentFriendId.value = null
+  currentGroupId.value = null
+  currentGroupDetail.value = null
+  messages.value = []
 }
 
 onMounted(async () => {
@@ -283,6 +512,7 @@ onMounted(async () => {
 
   try {
     await loadFriends()
+    await loadGroups()
     connectSocket()
   } catch (error) {
     errorMessage.value = (error as Error).message
@@ -299,47 +529,81 @@ onBeforeUnmount(() => {
     <AppNav />
     <section
       class="chat-shell card"
-      :class="{ 'mobile-show-chat': currentFriendId !== null }"
+      :class="{ 'mobile-show-chat': conversationType !== null }"
     >
       <aside class="sidebar">
         <div class="sidebar-top">
           <div>
-            <p class="apple-label">Contacts</p>
-            <h2>好友列表</h2>
+            <p class="apple-label">Conversations</p>
+            <h2>会话</h2>
           </div>
           <small class="muted">{{ socketConnected ? '在线同步中' : '等待连接' }}</small>
         </div>
-        <div v-if="friends.length === 0" class="empty-state">暂无好友，请先在好友申请页添加好友。</div>
-        <button
-          v-for="friend in friends"
-          :key="friend.friendId"
-          class="friend-item"
-          :class="{ active: currentFriendId === friend.friendId }"
-          @click="selectFriend(friend.friendId)"
-        >
-          <div class="friend-avatar">{{ friend.nickname.slice(0, 1).toUpperCase() }}</div>
-          <div class="friend-copy">
-            <strong>{{ friend.nickname }}</strong>
-            <span>{{ friend.signature || '这个人很懒，还没写签名。' }}</span>
-          </div>
-        </button>
+        <div class="sidebar-tabs">
+          <button
+            class="tab-btn"
+            :class="{ active: sidebarTab === 'friend' }"
+            @click="sidebarTab = 'friend'"
+          >好友 ({{ friends.length }})</button>
+          <button
+            class="tab-btn"
+            :class="{ active: sidebarTab === 'group' }"
+            @click="sidebarTab = 'group'"
+          >群聊 ({{ groups.length }})</button>
+        </div>
+
+        <template v-if="sidebarTab === 'friend'">
+          <div v-if="friends.length === 0" class="empty-state">暂无好友，请先在好友申请页添加好友。</div>
+          <button
+            v-for="friend in friends"
+            :key="'f' + friend.friendId"
+            class="friend-item"
+            :class="{ active: conversationType === 'friend' && currentFriendId === friend.friendId }"
+            @click="selectFriend(friend.friendId)"
+          >
+            <div class="friend-avatar">{{ friend.nickname.slice(0, 1).toUpperCase() }}</div>
+            <div class="friend-copy">
+              <strong>{{ friend.nickname }}</strong>
+              <span>{{ friend.signature || '这个人很懒，还没写签名。' }}</span>
+            </div>
+          </button>
+        </template>
+
+        <template v-else>
+          <button class="apple-button create-group-btn" type="button" @click="showCreateGroup = true">＋ 新建群聊</button>
+          <div v-if="groups.length === 0" class="empty-state">暂无群聊,点击上方按钮创建。</div>
+          <button
+            v-for="group in groups"
+            :key="'g' + group.id"
+            class="friend-item"
+            :class="{ active: conversationType === 'group' && currentGroupId === group.id }"
+            @click="selectGroup(group.id)"
+          >
+            <div class="friend-avatar group">#</div>
+            <div class="friend-copy">
+              <strong>{{ group.name }}</strong>
+              <span>{{ group.memberCount }} 位成员</span>
+            </div>
+          </button>
+        </template>
       </aside>
 
       <section class="chat-panel">
         <div class="chat-top">
-          <button class="back-btn" type="button" @click="backToList" aria-label="返回好友列表">‹</button>
+          <button class="back-btn" type="button" @click="backToList" aria-label="返回会话列表">‹</button>
           <div class="chat-top-main">
-            <p class="apple-label">Conversation</p>
-            <h2>{{ currentFriend ? currentFriend.nickname : '聊天窗口' }}</h2>
+            <p class="apple-label">{{ conversationType === 'group' ? 'Group' : 'Conversation' }}</p>
+            <h2>{{ conversationTitle }}</h2>
             <small class="muted" v-if="authStore.user">当前身份：{{ authStore.user.nickname || authStore.user.username }}</small>
           </div>
-          <button class="apple-button secondary refresh-btn" @click="loadFriends">刷新好友</button>
+          <button v-if="conversationType === 'group'" class="apple-button secondary refresh-btn" @click="showGroupInfo = true">群信息</button>
+          <button v-else class="apple-button secondary refresh-btn" @click="loadFriends">刷新好友</button>
         </div>
         <p v-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
         <p v-if="!cryptoReady && !errorMessage" class="status-text error">
           当前环境不支持端到端加密，仅可查看已有会话。
         </p>
-        <div v-if="!currentFriendId" class="empty-state">请选择一个好友开始聊天</div>
+        <div v-if="!conversationType" class="empty-state">请选择一个好友或群聊开始聊天</div>
         <div v-else ref="messageListRef" class="messages">
           <div
             v-for="(message, index) in messages"
@@ -349,7 +613,15 @@ onBeforeUnmount(() => {
           >
             <div class="message-item">
               <div class="message-meta">
-                <strong>{{ isMine(message) ? '我' : currentFriend?.nickname || message.senderId }}</strong>
+                <strong>
+                  {{
+                    isMine(message)
+                      ? '我'
+                      : conversationType === 'group'
+                      ? groupMemberDisplayName(message.senderId)
+                      : currentFriend?.nickname || message.senderId
+                  }}
+                </strong>
                 <small v-if="formatChatMessageTime(message.createdAt)">{{ formatChatMessageTime(message.createdAt) }}</small>
               </div>
               <p>{{ message.content }}</p>
@@ -360,13 +632,13 @@ onBeforeUnmount(() => {
           <input
             v-model="draft"
             class="apple-input"
-            :disabled="!currentFriendId || sending || !cryptoReady"
+            :disabled="!conversationType || sending || !cryptoReady"
             :placeholder="cryptoReady ? '输入消息' : '当前环境不支持发送加密消息'"
             @keyup.enter="sendMessage"
           />
           <button
             class="apple-button"
-            :disabled="!currentFriendId || sending || !cryptoReady"
+            :disabled="!conversationType || sending || !cryptoReady"
             @click="sendMessage"
           >
             {{ sending ? '发送中...' : '发送' }}
@@ -374,6 +646,25 @@ onBeforeUnmount(() => {
         </div>
       </section>
     </section>
+
+    <CreateGroupModal
+      :visible="showCreateGroup"
+      :friends="friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname, publicKey: f.publicKey }))"
+      @close="showCreateGroup = false"
+      @submit="handleCreateGroup"
+    />
+
+    <GroupInfoPanel
+      :visible="showGroupInfo && !!currentGroupDetail"
+      :group-name="currentGroupDetail?.name || ''"
+      :owner-id="currentGroupDetail?.ownerId || 0"
+      :members="currentGroupDetail?.members || []"
+      :my-user-id="authStore.user?.id ?? null"
+      :friends="friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname, publicKey: f.publicKey }))"
+      @close="showGroupInfo = false"
+      @invite="handleInviteMembers"
+      @leave="handleLeaveGroup"
+    />
   </div>
 </template>
 
@@ -437,6 +728,42 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, #eef5ff 0%, #d9e8ff 100%);
   color: #0071e3;
   font-weight: 700;
+}
+
+.friend-avatar.group {
+  background: linear-gradient(180deg, #fff5d6 0%, #ffe7a8 100%);
+  color: #b25e00;
+}
+
+.sidebar-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.tab-btn {
+  padding: 8px 10px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(245, 245, 247, 0.6);
+  color: #1d1d1f;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tab-btn.active {
+  background: rgba(0, 113, 227, 0.12);
+  color: #0071e3;
+  box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.18);
+}
+
+.create-group-btn {
+  width: 100%;
+  margin-bottom: 4px;
+  font-size: 13px;
+  padding: 10px 14px;
 }
 
 .friend-copy {

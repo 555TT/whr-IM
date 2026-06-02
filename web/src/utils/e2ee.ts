@@ -152,6 +152,29 @@ export async function decryptMessage(privateKey: CryptoKey, ciphertext: string) 
   return new TextDecoder().decode(decrypted)
 }
 
+// 群聊混合加密会用 RSA-OAEP 包裹 AES 会话密钥的原始字节,
+// 这两个函数提供"对任意 raw bytes 的 RSA 加解密"基础能力。
+export async function encryptRawWithPublicKey(publicKey: CryptoKey, raw: ArrayBuffer) {
+  const ciphertext = await window.crypto.subtle.encrypt({ name: ALGORITHM }, publicKey, raw)
+  return arrayBufferToBase64(ciphertext)
+}
+
+export async function decryptRawWithPrivateKey(privateKey: CryptoKey, ciphertextBase64: string) {
+  return window.crypto.subtle.decrypt(
+    { name: ALGORITHM },
+    privateKey,
+    base64ToArrayBuffer(ciphertextBase64)
+  )
+}
+
+export function bytesToBase64(buffer: ArrayBuffer) {
+  return arrayBufferToBase64(buffer)
+}
+
+export function base64ToBytes(value: string) {
+  return base64ToArrayBuffer(value)
+}
+
 export function savePrivateKey(userId: number, serializedKey: string) {
   localStorage.setItem(buildPrivateKeyStorageKey(userId), serializedKey)
 }
