@@ -12,8 +12,18 @@ func TestLoadReadsMySQLAndServerConfigFromYAML(t *testing.T) {
 		t.Fatalf("expected server port :8080, got %q", cfg.Server.Port)
 	}
 
-	expectedDSN := "root:easy-chat@tcp(192.168.18.66:13306)/whr_im?charset=utf8mb4&parseTime=True&loc=Local"
+	expectedDSN := "root:wanghaoran666@tcp(localhost:3306)/whr_im?charset=utf8mb4&parseTime=True&loc=Local"
 	if cfg.MySQL.DSN != expectedDSN {
 		t.Fatalf("expected mysql dsn %q, got %q", expectedDSN, cfg.MySQL.DSN)
+	}
+
+	if cfg.ObjectStorage.Endpoint != "localhost:9000" {
+		t.Fatalf("expected object storage endpoint localhost:9000, got %q", cfg.ObjectStorage.Endpoint)
+	}
+	if cfg.ObjectStorage.Bucket != "whr-im" {
+		t.Fatalf("expected object storage bucket whr-im, got %q", cfg.ObjectStorage.Bucket)
+	}
+	if cfg.ObjectStorage.PublicBaseURL != "http://localhost:9000/whr-im" {
+		t.Fatalf("expected object storage public base url http://localhost:9000/whr-im, got %q", cfg.ObjectStorage.PublicBaseURL)
 	}
 }

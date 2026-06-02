@@ -391,6 +391,10 @@ func newTestRouter(t *testing.T) http.Handler {
 	if err != nil {
 		t.Fatalf("failed to create gorm group message repository: %v", err)
 	}
+	momentRepo, err := repository.NewGormMomentRepository(db)
+	if err != nil {
+		t.Fatalf("failed to create gorm moment repository: %v", err)
+	}
 
-	return NewWithRepositories(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo)
+	return NewWithRepositories(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo, momentRepo)
 }

@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import ChatView from '../views/ChatView.vue'
 import FriendRequestsView from '../views/FriendRequestsView.vue'
 import LoginView from '../views/LoginView.vue'
+import MomentsView from '../views/MomentsView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import { useAuthStore } from '../stores/auth'
@@ -14,6 +15,7 @@ const router = createRouter({
     { path: '/login', component: LoginView, meta: { guestOnly: true } },
     { path: '/register', component: RegisterView, meta: { guestOnly: true } },
     { path: '/chat', component: ChatView, meta: { requiresAuth: true } },
+    { path: '/moments', component: MomentsView, meta: { requiresAuth: true } },
     { path: '/friend-requests', component: FriendRequestsView, meta: { requiresAuth: true } },
     { path: '/profile', component: ProfileView, meta: { requiresAuth: true } }
   ]

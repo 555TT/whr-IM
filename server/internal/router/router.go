@@ -46,12 +46,24 @@ func New(cfg *config.Config) *gin.Engine {
 	if err != nil {
 		log.Fatal(err)
 	}
+	momentRepo, err := repository.NewGormMomentRepository(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+	storage, err := service.NewObjectStorageFromConfig(cfg.ObjectStorage)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	return NewWithRepositories(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo)
+	return newEngine(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo, momentRepo, storage)
 }
 
 func NewWithUserRepository(userRepo repository.UserRepository) *gin.Engine {
-	return NewWithRepositories(userRepo, nil, nil, nil, nil)
+	storage, err := service.NewObjectStorageFromConfig(config.ObjectStorageConfig{PublicBaseURL: "http://localhost:9000"})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return newEngine(userRepo, nil, nil, nil, nil, nil, storage)
 }
 
 func NewWithRepositories(
@@ -60,6 +72,23 @@ func NewWithRepositories(
 	messageRepo repository.MessageRepository,
 	groupRepo repository.GroupRepository,
 	groupMessageRepo repository.GroupMessageRepository,
+	momentRepo repository.MomentRepository,
+) *gin.Engine {
+	storage, err := service.NewObjectStorageFromConfig(config.ObjectStorageConfig{PublicBaseURL: "http://localhost:9000"})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return newEngine(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo, momentRepo, storage)
+}
+
+func newEngine(
+	userRepo repository.UserRepository,
+	friendRepo repository.FriendRepository,
+	messageRepo repository.MessageRepository,
+	groupRepo repository.GroupRepository,
+	groupMessageRepo repository.GroupMessageRepository,
+	momentRepo repository.MomentRepository,
+	storage service.ObjectStorage,
 ) *gin.Engine {
 	r := gin.Default()
 	r.Use(middleware.CORS())
@@ -69,7 +98,7 @@ func NewWithRepositories(
 	authService := service.NewAuthService(userRepo, "dev-secret")
 	authHandler := handler.NewAuthUserHandler(authService)
 	wsHandler := handler.NewWebSocketHandler(authService, hub)
-	uploadService := service.NewUploadService(service.NewStaticObjectStorage("http://localhost:9000"))
+	uploadService := service.NewUploadService(storage)
 	uploadHandler := handler.NewUploadHandler(uploadService)
 
 	r.GET("/ws", wsHandler.Connect)
@@ -115,6 +144,17 @@ func NewWithRepositories(
 			groups.DELETE("/:id/members/me", groupHandler.LeaveGroup)
 			groups.POST("/:id/messages", groupMessageHandler.Create)
 			groups.GET("/:id/messages", groupMessageHandler.List)
+		}
+
+		if momentRepo != nil {
+			momentService := service.NewMomentService(momentRepo, friendRepo, userRepo, storage)
+			momentHandler := handler.NewMomentHandler(momentService)
+			authed.POST("/moments", momentHandler.Create)
+			authed.GET("/moments", momentHandler.List)
+			authed.DELETE("/moments/:id", momentHandler.Delete)
+			authed.POST("/moments/:id/likes", momentHandler.Like)
+			authed.DELETE("/moments/:id/likes/me", momentHandler.Unlike)
+			authed.POST("/moments/:id/comments", momentHandler.CreateComment)
 		}
 	}
 

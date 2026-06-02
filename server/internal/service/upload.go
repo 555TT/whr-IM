@@ -17,6 +17,7 @@ type UploadedImage struct {
 
 type ObjectStorage interface {
 	UploadImage(ctx context.Context, objectKey string, contentType string, data []byte) (string, error)
+	ObjectURL(ctx context.Context, objectKey string) (string, error)
 }
 
 type UploadService struct {
@@ -60,5 +61,9 @@ func NewStaticObjectStorage(baseURL string) *StaticObjectStorage {
 }
 
 func (s *StaticObjectStorage) UploadImage(_ context.Context, objectKey string, _ string, _ []byte) (string, error) {
+	return s.baseURL + "/" + objectKey, nil
+}
+
+func (s *StaticObjectStorage) ObjectURL(_ context.Context, objectKey string) (string, error) {
 	return s.baseURL + "/" + objectKey, nil
 }

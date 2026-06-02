@@ -21,6 +21,11 @@ type MySQLConfig struct {
 }
 
 type ObjectStorageConfig struct {
+	Endpoint      string `yaml:"endpoint"`
+	AccessKey     string `yaml:"accessKey"`
+	SecretKey     string `yaml:"secretKey"`
+	Bucket        string `yaml:"bucket"`
+	UseSSL        bool   `yaml:"useSSL"`
 	PublicBaseURL string `yaml:"publicBaseUrl"`
 }
 

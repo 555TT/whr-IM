@@ -1,0 +1,403 @@
+import { onMounted, ref } from 'vue';
+import AppNav from '../components/AppNav.vue';
+import { http } from '../api/http';
+import { useAuthStore } from '../stores/auth';
+const authStore = useAuthStore();
+const moments = ref([]);
+const content = ref('');
+const uploadedImageKey = ref('');
+const uploadedImageUrl = ref('');
+const feedback = ref('');
+const errorMessage = ref('');
+const loading = ref(false);
+const uploadingImage = ref(false);
+const commentDrafts = ref({});
+async function loadMoments() {
+    const { data } = await http.get('/moments');
+    moments.value = data;
+}
+async function uploadImage(event) {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file)
+        return;
+    feedback.value = '';
+    errorMessage.value = '';
+    uploadingImage.value = true;
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const { data } = await http.post('/uploads/images', formData);
+        uploadedImageKey.value = data.objectKey;
+        uploadedImageUrl.value = data.url;
+        feedback.value = '图片已上传';
+    }
+    catch (error) {
+        errorMessage.value = error.message;
+    }
+    finally {
+        uploadingImage.value = false;
+        input.value = '';
+    }
+}
+async function publishMoment() {
+    if (!content.value.trim())
+        return;
+    feedback.value = '';
+    errorMessage.value = '';
+    loading.value = true;
+    try {
+        await http.post('/moments', {
+            content: content.value.trim(),
+            imageKeys: uploadedImageKey.value ? [uploadedImageKey.value] : []
+        });
+        content.value = '';
+        uploadedImageKey.value = '';
+        uploadedImageUrl.value = '';
+        feedback.value = '动态已发布';
+        await loadMoments();
+    }
+    catch (error) {
+        errorMessage.value = error.message;
+    }
+    finally {
+        loading.value = false;
+    }
+}
+async function toggleLike(item) {
+    errorMessage.value = '';
+    feedback.value = '';
+    try {
+        if (item.likedByMe) {
+            await http.delete(`/moments/${item.id}/likes/me`);
+        }
+        else {
+            await http.post(`/moments/${item.id}/likes`);
+        }
+        await loadMoments();
+    }
+    catch (error) {
+        errorMessage.value = error.message;
+    }
+}
+async function submitComment(item) {
+    const content = commentDrafts.value[item.id]?.trim();
+    if (!content)
+        return;
+    errorMessage.value = '';
+    feedback.value = '';
+    try {
+        await http.post(`/moments/${item.id}/comments`, { content });
+        commentDrafts.value[item.id] = '';
+        await loadMoments();
+    }
+    catch (error) {
+        errorMessage.value = error.message;
+    }
+}
+async function deleteMoment(item) {
+    errorMessage.value = '';
+    feedback.value = '';
+    try {
+        await http.delete(`/moments/${item.id}`);
+        feedback.value = '动态已删除';
+        await loadMoments();
+    }
+    catch (error) {
+        errorMessage.value = error.message;
+    }
+}
+onMounted(loadMoments);
+debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
+const __VLS_ctx = {};
+let __VLS_components;
+let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['composer-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['upload-picker']} */ ;
+/** @type {__VLS_StyleScopedClasses['upload-picker']} */ ;
+/** @type {__VLS_StyleScopedClasses['moments-layout']} */ ;
+// CSS variable injection 
+// CSS variable injection end 
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "page-shell apple-page" },
+});
+/** @type {[typeof AppNav, ]} */ ;
+// @ts-ignore
+const __VLS_0 = __VLS_asFunctionalComponent(AppNav, new AppNav({}));
+const __VLS_1 = __VLS_0({}, ...__VLS_functionalComponentArgsRest(__VLS_0));
+__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+    ...{ class: "moments-layout" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "card apple-panel composer-card" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "apple-label" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.h1, __VLS_intrinsicElements.h1)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "muted" },
+});
+if (__VLS_ctx.feedback) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "status-text success" },
+    });
+    (__VLS_ctx.feedback);
+}
+if (__VLS_ctx.errorMessage) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "status-text error" },
+    });
+    (__VLS_ctx.errorMessage);
+}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.textarea)({
+    value: (__VLS_ctx.content),
+    ...{ class: "apple-textarea" },
+    placeholder: "分享这一刻...",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "upload-field" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "apple-label" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "upload-picker" },
+    ...{ class: ({ uploading: __VLS_ctx.uploadingImage }) },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    ...{ onChange: (__VLS_ctx.uploadImage) },
+    ...{ class: "upload-input" },
+    type: "file",
+    accept: "image/*",
+});
+if (__VLS_ctx.uploadedImageUrl) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.img)({
+        src: (__VLS_ctx.uploadedImageUrl),
+        alt: "uploaded preview",
+        ...{ class: "upload-cover" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "upload-overlay" },
+    });
+}
+else {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "upload-plus" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "upload-hint" },
+    });
+}
+if (__VLS_ctx.uploadingImage) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "muted" },
+    });
+}
+if (__VLS_ctx.uploadedImageUrl) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "upload-tools" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.uploadedImageUrl))
+                    return;
+                __VLS_ctx.uploadedImageKey = '';
+                __VLS_ctx.uploadedImageUrl = '';
+            } },
+        ...{ class: "apple-button secondary" },
+        type: "button",
+    });
+}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.publishMoment) },
+    ...{ class: "apple-button" },
+    disabled: (__VLS_ctx.loading || __VLS_ctx.uploadingImage),
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "feed-column" },
+});
+if (__VLS_ctx.moments.length === 0) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "card apple-panel empty-state-card" },
+    });
+}
+for (const [item] of __VLS_getVForSourceType((__VLS_ctx.moments))) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
+        key: (item.id),
+        ...{ class: "card apple-panel moment-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "moment-head" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.img)({
+        src: (item.avatar),
+        alt: "avatar",
+        ...{ class: "avatar" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (item.nickname);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "muted moment-time" },
+    });
+    (item.createdAt);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "moment-content" },
+    });
+    (item.content);
+    if (item.images.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "moment-images" },
+        });
+        for (const [src] of __VLS_getVForSourceType((item.images))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.img)({
+                key: (src),
+                src: (src),
+                alt: "moment image",
+                ...{ class: "moment-image" },
+            });
+        }
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "moment-actions" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                __VLS_ctx.toggleLike(item);
+            } },
+        ...{ class: "apple-button secondary" },
+        type: "button",
+    });
+    (item.likedByMe ? '取消点赞' : '点赞');
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "muted" },
+    });
+    (item.likeCount);
+    if (__VLS_ctx.authStore.user?.id === item.userId) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!(__VLS_ctx.authStore.user?.id === item.userId))
+                        return;
+                    __VLS_ctx.deleteMoment(item);
+                } },
+            ...{ class: "apple-button danger" },
+            type: "button",
+        });
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "comment-composer" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        ...{ class: "apple-input" },
+        placeholder: "写下评论...",
+    });
+    (__VLS_ctx.commentDrafts[item.id]);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                __VLS_ctx.submitComment(item);
+            } },
+        ...{ class: "apple-button secondary" },
+        type: "button",
+    });
+    if (item.comments.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "comment-list" },
+        });
+        for (const [comment] of __VLS_getVForSourceType((item.comments))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                key: (comment.id),
+                ...{ class: "comment-item" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+            (comment.nickname);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "comment-separator" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+            (comment.content);
+        }
+    }
+}
+/** @type {__VLS_StyleScopedClasses['page-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-page']} */ ;
+/** @type {__VLS_StyleScopedClasses['moments-layout']} */ ;
+/** @type {__VLS_StyleScopedClasses['card']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['success']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['error']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-textarea']} */ ;
+/** @type {__VLS_StyleScopedClasses['upload-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['upload-picker']} */ ;
+/** @type {__VLS_StyleScopedClasses['upload-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['upload-cover']} */ ;
+/** @type {__VLS_StyleScopedClasses['upload-overlay']} */ ;
+/** @type {__VLS_StyleScopedClasses['upload-plus']} */ ;
+/** @type {__VLS_StyleScopedClasses['upload-hint']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['upload-tools']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['feed-column']} */ ;
+/** @type {__VLS_StyleScopedClasses['card']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['empty-state-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['card']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['moment-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['moment-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['avatar']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['moment-time']} */ ;
+/** @type {__VLS_StyleScopedClasses['moment-content']} */ ;
+/** @type {__VLS_StyleScopedClasses['moment-images']} */ ;
+/** @type {__VLS_StyleScopedClasses['moment-image']} */ ;
+/** @type {__VLS_StyleScopedClasses['moment-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['danger']} */ ;
+/** @type {__VLS_StyleScopedClasses['comment-composer']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['comment-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['comment-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['comment-separator']} */ ;
+var __VLS_dollars;
+const __VLS_self = (await import('vue')).defineComponent({
+    setup() {
+        return {
+            AppNav: AppNav,
+            authStore: authStore,
+            moments: moments,
+            content: content,
+            uploadedImageKey: uploadedImageKey,
+            uploadedImageUrl: uploadedImageUrl,
+            feedback: feedback,
+            errorMessage: errorMessage,
+            loading: loading,
+            uploadingImage: uploadingImage,
+            commentDrafts: commentDrafts,
+            uploadImage: uploadImage,
+            publishMoment: publishMoment,
+            toggleLike: toggleLike,
+            submitComment: submitComment,
+            deleteMoment: deleteMoment,
+        };
+    },
+});
+export default (await import('vue')).defineComponent({
+    setup() {
+        return {};
+    },
+});
+; /* PartiallyEnd: #4569/main.vue */
