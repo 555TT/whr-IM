@@ -1,6 +1,9 @@
 CREATE DATABASE IF NOT EXISTS whr_im DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE whr_im;
 
+DROP TABLE IF EXISTS moment_comments;
+DROP TABLE IF EXISTS moment_likes;
+DROP TABLE IF EXISTS moments;
 DROP TABLE IF EXISTS group_message_keys;
 DROP TABLE IF EXISTS group_messages;
 DROP TABLE IF EXISTS group_members;
@@ -20,8 +23,6 @@ CREATE TABLE users (
     signature VARCHAR(255) NOT NULL DEFAULT '' COMMENT '个性签名',
     public_key TEXT NOT NULL COMMENT '用户公钥',
     public_key_algorithm VARCHAR(50) NOT NULL DEFAULT '' COMMENT '公钥算法',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_users_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
@@ -31,14 +32,11 @@ CREATE TABLE friend_requests (
     from_user_id BIGINT UNSIGNED NOT NULL COMMENT '申请人 ID',
     to_user_id BIGINT UNSIGNED NOT NULL COMMENT '接收人 ID',
     message VARCHAR(255) NOT NULL DEFAULT '' COMMENT '申请附言',
-    status ENUM('pending', 'accepted', 'rejected') NOT NULL DEFAULT 'pending' COMMENT '申请状态',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    handled_at DATETIME NULL DEFAULT NULL COMMENT '处理时间',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '申请状态',
     PRIMARY KEY (id),
     KEY idx_friend_requests_from_user_id (from_user_id),
     KEY idx_friend_requests_to_user_id (to_user_id),
     KEY idx_friend_requests_status (status),
-    UNIQUE KEY uk_friend_requests_pending_pair (from_user_id, to_user_id, status),
     CONSTRAINT fk_friend_requests_from_user FOREIGN KEY (from_user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_friend_requests_to_user FOREIGN KEY (to_user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='好友申请表';
@@ -47,7 +45,6 @@ CREATE TABLE friends (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
     user_id BIGINT UNSIGNED NOT NULL COMMENT '用户 ID',
     friend_id BIGINT UNSIGNED NOT NULL COMMENT '好友 ID',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_friends_user_friend (user_id, friend_id),
     KEY idx_friends_friend_id (friend_id),
@@ -104,6 +101,43 @@ CREATE TABLE group_message_keys (
     CONSTRAINT fk_group_message_keys_message FOREIGN KEY (message_id) REFERENCES group_messages (id) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_group_message_keys_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='群消息会话密钥包裹表';
+
+CREATE TABLE moments (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '发布用户 ID',
+    content TEXT NOT NULL COMMENT '朋友圈正文',
+    images_json TEXT NOT NULL COMMENT '图片 objectKey 列表 JSON',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    KEY idx_moments_user (user_id),
+    CONSTRAINT fk_moments_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='朋友圈动态表';
+
+CREATE TABLE moment_likes (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    moment_id BIGINT UNSIGNED NOT NULL COMMENT '朋友圈动态 ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '点赞用户 ID',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '点赞时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_moment_likes_moment_user (moment_id, user_id),
+    KEY idx_moment_likes_moment_id (moment_id),
+    KEY idx_moment_likes_user_id (user_id),
+    CONSTRAINT fk_moment_likes_moment FOREIGN KEY (moment_id) REFERENCES moments (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_moment_likes_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='朋友圈点赞表';
+
+CREATE TABLE moment_comments (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    moment_id BIGINT UNSIGNED NOT NULL COMMENT '朋友圈动态 ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '评论用户 ID',
+    content TEXT NOT NULL COMMENT '评论内容',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '评论时间',
+    PRIMARY KEY (id),
+    KEY idx_moment_comments_moment_id (moment_id),
+    KEY idx_moment_comments_user_id (user_id),
+    CONSTRAINT fk_moment_comments_moment FOREIGN KEY (moment_id) REFERENCES moments (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_moment_comments_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='朋友圈评论表';
 
 CREATE TABLE messages (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
