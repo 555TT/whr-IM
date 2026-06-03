@@ -11,6 +11,7 @@ import (
 type MomentRepository interface {
 	Create(moment *model.Moment) error
 	ListVisibleForUser(userID uint64, friendIDs []uint64) ([]model.Moment, error)
+	ListByUserID(userID uint64) ([]model.Moment, error)
 	FindByID(id uint64) (*model.Moment, error)
 	Delete(momentID uint64) error
 	Like(momentID uint64, userID uint64) error
@@ -43,6 +44,14 @@ func (r *GormMomentRepository) ListVisibleForUser(userID uint64, friendIDs []uin
 
 	var moments []model.Moment
 	if err := r.db.Where("user_id IN ?", visibleUserIDs).Order("created_at desc, id desc").Find(&moments).Error; err != nil {
+		return nil, err
+	}
+	return moments, nil
+}
+
+func (r *GormMomentRepository) ListByUserID(userID uint64) ([]model.Moment, error) {
+	var moments []model.Moment
+	if err := r.db.Where("user_id = ?", userID).Order("created_at desc, id desc").Find(&moments).Error; err != nil {
 		return nil, err
 	}
 	return moments, nil

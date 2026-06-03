@@ -37,6 +37,8 @@ type MomentCommentView struct {
 	CreatedAt string `json:"createdAt"`
 }
 
+var ErrMomentNotVisible = fmt.Errorf("moment is not visible to current user")
+
 type MomentView struct {
 	ID        uint64              `json:"id"`
 	UserID    uint64              `json:"userId"`
@@ -79,7 +81,7 @@ func (s *MomentService) Like(userID uint64, momentID uint64) error {
 		return err
 	}
 	if !s.canViewMoment(userID, moment.UserID) {
-		return fmt.Errorf("moment is not visible to current user")
+		return ErrMomentNotVisible
 	}
 	return s.momentRepo.Like(momentID, userID)
 }
@@ -90,7 +92,7 @@ func (s *MomentService) Unlike(userID uint64, momentID uint64) error {
 		return err
 	}
 	if !s.canViewMoment(userID, moment.UserID) {
-		return fmt.Errorf("moment is not visible to current user")
+		return ErrMomentNotVisible
 	}
 	return s.momentRepo.Unlike(momentID, userID)
 }
@@ -104,7 +106,7 @@ func (s *MomentService) CreateComment(userID uint64, momentID uint64, input Crea
 		return err
 	}
 	if !s.canViewMoment(userID, moment.UserID) {
-		return fmt.Errorf("moment is not visible to current user")
+		return ErrMomentNotVisible
 	}
 	comment := &model.MomentComment{
 		MomentID: momentID,
@@ -145,6 +147,29 @@ func (s *MomentService) ListVisible(userID uint64) ([]MomentView, error) {
 			return nil, err
 		}
 		view, err := s.buildMomentViewForUser(&moment, userID, user.Nickname, user.Avatar)
+		if err != nil {
+			return nil, err
+		}
+		views = append(views, *view)
+	}
+	return views, nil
+}
+
+func (s *MomentService) ListVisibleByUser(viewerID uint64, ownerID uint64) ([]MomentView, error) {
+	if !s.canViewMoment(viewerID, ownerID) {
+		return nil, ErrMomentNotVisible
+	}
+	moments, err := s.momentRepo.ListByUserID(ownerID)
+	if err != nil {
+		return nil, err
+	}
+	owner, err := s.userRepo.FindByID(ownerID)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]MomentView, 0, len(moments))
+	for _, moment := range moments {
+		view, err := s.buildMomentViewForUser(&moment, viewerID, owner.Nickname, owner.Avatar)
 		if err != nil {
 			return nil, err
 		}

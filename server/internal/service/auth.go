@@ -16,6 +16,7 @@ const defaultAvatar = "https://api.dicebear.com/7.x/initials/svg?seed=default-us
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrInvalidPublicKey = errors.New("invalid public key update")
+var ErrProfileNotVisible = errors.New("profile is not visible to current user")
 
 const supportedPublicKeyAlgorithm = "rsa-oaep-sha256"
 
@@ -48,6 +49,13 @@ type UpdateProfileInput struct {
 type UpdatePublicKeyInput struct {
 	PublicKey string
 	Algorithm string
+}
+
+type PublicProfile struct {
+	ID        uint64 `json:"id"`
+	Nickname  string `json:"nickname"`
+	Avatar    string `json:"avatar"`
+	Signature string `json:"signature"`
 }
 
 func (s *AuthService) Register(input RegisterInput) (*model.User, error) {
@@ -130,6 +138,28 @@ func (s *AuthService) ParseToken(tokenString string) (uint64, error) {
 
 func (s *AuthService) GetProfile(userID uint64) (*model.User, error) {
 	return s.repo.FindByID(userID)
+}
+
+func (s *AuthService) GetVisibleProfile(viewerID uint64, targetUserID uint64, friendRepo repository.FriendRepository) (*PublicProfile, error) {
+	if viewerID != targetUserID {
+		visible, err := friendRepo.AreFriends(viewerID, targetUserID)
+		if err != nil {
+			return nil, err
+		}
+		if !visible {
+			return nil, ErrProfileNotVisible
+		}
+	}
+	user, err := s.repo.FindByID(targetUserID)
+	if err != nil {
+		return nil, err
+	}
+	return &PublicProfile{
+		ID:        user.ID,
+		Nickname:  user.Nickname,
+		Avatar:    user.Avatar,
+		Signature: user.Signature,
+	}, nil
 }
 
 func (s *AuthService) UpdateProfile(userID uint64, input UpdateProfileInput) (*model.User, error) {

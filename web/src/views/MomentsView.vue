@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import AppNav from '../components/AppNav.vue'
 import { http } from '../api/http'
@@ -32,6 +33,7 @@ interface UploadResponse {
 }
 
 const authStore = useAuthStore()
+const router = useRouter()
 const moments = ref<MomentItem[]>([])
 const content = ref('')
 const uploadedImageKey = ref('')
@@ -133,6 +135,10 @@ async function deleteMoment(item: MomentItem) {
   }
 }
 
+function openHomepage(userId: number) {
+  router.push(`/users/${userId}`)
+}
+
 onMounted(loadMoments)
 </script>
 
@@ -172,9 +178,9 @@ onMounted(loadMoments)
         <div v-if="moments.length === 0" class="card apple-panel empty-state-card">暂无动态</div>
         <article v-for="item in moments" :key="item.id" class="card apple-panel moment-card">
           <div class="moment-head">
-            <img :src="item.avatar" alt="avatar" class="avatar" />
+            <img :src="item.avatar" alt="avatar" class="avatar clickable-avatar" @click="openHomepage(item.userId)" />
             <div>
-              <strong>{{ item.nickname }}</strong>
+              <strong class="clickable-name" @click="openHomepage(item.userId)">{{ item.nickname }}</strong>
               <p class="muted moment-time">{{ item.createdAt }}</p>
             </div>
           </div>
@@ -326,6 +332,18 @@ onMounted(loadMoments)
   height: 44px;
   border-radius: 50%;
   object-fit: cover;
+}
+
+.clickable-avatar {
+  cursor: pointer;
+}
+
+.clickable-name {
+  cursor: pointer;
+}
+
+.clickable-name:hover {
+  color: #0071e3;
 }
 
 .moment-time {

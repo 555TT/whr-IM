@@ -52,6 +52,20 @@ func (h *MomentHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, moments)
 }
 
+func (h *MomentHandler) ListByUser(c *gin.Context) {
+	targetUserID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid user id"})
+		return
+	}
+	moments, err := h.momentService.ListVisibleByUser(c.MustGet("userID").(uint64), targetUserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, moments)
+}
+
 func (h *MomentHandler) Like(c *gin.Context) {
 	momentID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {

@@ -1,8 +1,10 @@
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import AppNav from '../components/AppNav.vue';
 import { http } from '../api/http';
 import { useAuthStore } from '../stores/auth';
 const authStore = useAuthStore();
+const router = useRouter();
 const moments = ref([]);
 const content = ref('');
 const uploadedImageKey = ref('');
@@ -107,6 +109,9 @@ async function deleteMoment(item) {
         errorMessage.value = error.message;
     }
 }
+function openHomepage(userId) {
+    router.push(`/users/${userId}`);
+}
 onMounted(loadMoments);
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
@@ -115,6 +120,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['composer-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['upload-picker']} */ ;
 /** @type {__VLS_StyleScopedClasses['upload-picker']} */ ;
+/** @type {__VLS_StyleScopedClasses['clickable-name']} */ ;
 /** @type {__VLS_StyleScopedClasses['moments-layout']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
@@ -231,12 +237,20 @@ for (const [item] of __VLS_getVForSourceType((__VLS_ctx.moments))) {
         ...{ class: "moment-head" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.img)({
+        ...{ onClick: (...[$event]) => {
+                __VLS_ctx.openHomepage(item.userId);
+            } },
         src: (item.avatar),
         alt: "avatar",
-        ...{ class: "avatar" },
+        ...{ class: "avatar clickable-avatar" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({
+        ...{ onClick: (...[$event]) => {
+                __VLS_ctx.openHomepage(item.userId);
+            } },
+        ...{ class: "clickable-name" },
+    });
     (item.nickname);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
         ...{ class: "muted moment-time" },
@@ -354,6 +368,8 @@ for (const [item] of __VLS_getVForSourceType((__VLS_ctx.moments))) {
 /** @type {__VLS_StyleScopedClasses['moment-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['moment-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['avatar']} */ ;
+/** @type {__VLS_StyleScopedClasses['clickable-avatar']} */ ;
+/** @type {__VLS_StyleScopedClasses['clickable-name']} */ ;
 /** @type {__VLS_StyleScopedClasses['muted']} */ ;
 /** @type {__VLS_StyleScopedClasses['moment-time']} */ ;
 /** @type {__VLS_StyleScopedClasses['moment-content']} */ ;
@@ -392,6 +408,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             toggleLike: toggleLike,
             submitComment: submitComment,
             deleteMoment: deleteMoment,
+            openHomepage: openHomepage,
         };
     },
 });

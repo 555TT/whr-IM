@@ -163,6 +163,115 @@ func TestFriendRequestRejectsExistingFriend(t *testing.T) {
 	}
 }
 
+func TestUserHomepageProfileAccessControl(t *testing.T) {
+	r := newTestRouter(t)
+
+	aliceToken := registerAndLogin(t, r, "alice")
+	bobToken := registerAndLogin(t, r, "bobby")
+	carlToken := registerAndLogin(t, r, "carlx")
+
+	requestBody := []byte(`{"toUsername":"bobby","message":"add me"}`)
+	requestReq := httptest.NewRequest(http.MethodPost, "/api/friend-requests", bytes.NewReader(requestBody))
+	requestReq.Header.Set("Content-Type", "application/json")
+	requestReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	requestW := httptest.NewRecorder()
+	r.ServeHTTP(requestW, requestReq)
+	if requestW.Code != http.StatusCreated {
+		t.Fatalf("expected friend request status 201, got %d with body %s", requestW.Code, requestW.Body.String())
+	}
+
+	acceptReq := httptest.NewRequest(http.MethodPut, "/api/friend-requests/1/accept", nil)
+	acceptReq.Header.Set("Authorization", "Bearer "+bobToken)
+	acceptW := httptest.NewRecorder()
+	r.ServeHTTP(acceptW, acceptReq)
+	if acceptW.Code != http.StatusOK {
+		t.Fatalf("expected accept status 200, got %d with body %s", acceptW.Code, acceptW.Body.String())
+	}
+
+	selfReq := httptest.NewRequest(http.MethodGet, "/api/users/1/profile", nil)
+	selfReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	selfW := httptest.NewRecorder()
+	r.ServeHTTP(selfW, selfReq)
+	if selfW.Code != http.StatusOK {
+		t.Fatalf("expected self homepage profile status 200, got %d with body %s", selfW.Code, selfW.Body.String())
+	}
+
+	friendReq := httptest.NewRequest(http.MethodGet, "/api/users/1/profile", nil)
+	friendReq.Header.Set("Authorization", "Bearer "+bobToken)
+	friendW := httptest.NewRecorder()
+	r.ServeHTTP(friendW, friendReq)
+	if friendW.Code != http.StatusOK {
+		t.Fatalf("expected friend homepage profile status 200, got %d with body %s", friendW.Code, friendW.Body.String())
+	}
+
+	strangerReq := httptest.NewRequest(http.MethodGet, "/api/users/1/profile", nil)
+	strangerReq.Header.Set("Authorization", "Bearer "+carlToken)
+	strangerW := httptest.NewRecorder()
+	r.ServeHTTP(strangerW, strangerReq)
+	if strangerW.Code != http.StatusBadRequest {
+		t.Fatalf("expected stranger homepage profile status 400, got %d with body %s", strangerW.Code, strangerW.Body.String())
+	}
+}
+
+func TestUserHomepageMomentsAccessControl(t *testing.T) {
+	r := newTestRouter(t)
+
+	aliceToken := registerAndLogin(t, r, "alice")
+	bobToken := registerAndLogin(t, r, "bobby")
+	carlToken := registerAndLogin(t, r, "carlx")
+
+	publishReq := httptest.NewRequest(http.MethodPost, "/api/moments", bytes.NewReader([]byte(`{"content":"alice moment","imageKeys":[]}`)))
+	publishReq.Header.Set("Content-Type", "application/json")
+	publishReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	publishW := httptest.NewRecorder()
+	r.ServeHTTP(publishW, publishReq)
+	if publishW.Code != http.StatusCreated {
+		t.Fatalf("expected create moment status 201, got %d with body %s", publishW.Code, publishW.Body.String())
+	}
+
+	requestBody := []byte(`{"toUsername":"bobby","message":"add me"}`)
+	requestReq := httptest.NewRequest(http.MethodPost, "/api/friend-requests", bytes.NewReader(requestBody))
+	requestReq.Header.Set("Content-Type", "application/json")
+	requestReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	requestW := httptest.NewRecorder()
+	r.ServeHTTP(requestW, requestReq)
+	if requestW.Code != http.StatusCreated {
+		t.Fatalf("expected friend request status 201, got %d with body %s", requestW.Code, requestW.Body.String())
+	}
+
+	acceptReq := httptest.NewRequest(http.MethodPut, "/api/friend-requests/1/accept", nil)
+	acceptReq.Header.Set("Authorization", "Bearer "+bobToken)
+	acceptW := httptest.NewRecorder()
+	r.ServeHTTP(acceptW, acceptReq)
+	if acceptW.Code != http.StatusOK {
+		t.Fatalf("expected accept status 200, got %d with body %s", acceptW.Code, acceptW.Body.String())
+	}
+
+	selfReq := httptest.NewRequest(http.MethodGet, "/api/users/1/moments", nil)
+	selfReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	selfW := httptest.NewRecorder()
+	r.ServeHTTP(selfW, selfReq)
+	if selfW.Code != http.StatusOK {
+		t.Fatalf("expected self homepage moments status 200, got %d with body %s", selfW.Code, selfW.Body.String())
+	}
+
+	friendReq := httptest.NewRequest(http.MethodGet, "/api/users/1/moments", nil)
+	friendReq.Header.Set("Authorization", "Bearer "+bobToken)
+	friendW := httptest.NewRecorder()
+	r.ServeHTTP(friendW, friendReq)
+	if friendW.Code != http.StatusOK {
+		t.Fatalf("expected friend homepage moments status 200, got %d with body %s", friendW.Code, friendW.Body.String())
+	}
+
+	strangerReq := httptest.NewRequest(http.MethodGet, "/api/users/1/moments", nil)
+	strangerReq.Header.Set("Authorization", "Bearer "+carlToken)
+	strangerW := httptest.NewRecorder()
+	r.ServeHTTP(strangerW, strangerReq)
+	if strangerW.Code != http.StatusBadRequest {
+		t.Fatalf("expected stranger homepage moments status 400, got %d with body %s", strangerW.Code, strangerW.Body.String())
+	}
+}
+
 func TestFriendRequestCanBeRejected(t *testing.T) {
 	r := newTestRouter(t)
 

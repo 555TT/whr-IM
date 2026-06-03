@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"whr-im/server/internal/repository"
 	"whr-im/server/internal/service"
@@ -12,10 +13,11 @@ import (
 
 type AuthUserHandler struct {
 	authService *service.AuthService
+	friendRepo  repository.FriendRepository
 }
 
-func NewAuthUserHandler(authService *service.AuthService) *AuthUserHandler {
-	return &AuthUserHandler{authService: authService}
+func NewAuthUserHandler(authService *service.AuthService, friendRepo repository.FriendRepository) *AuthUserHandler {
+	return &AuthUserHandler{authService: authService, friendRepo: friendRepo}
 }
 
 type registerRequest struct {
@@ -114,6 +116,20 @@ func (h *AuthUserHandler) UpdateMe(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+func (h *AuthUserHandler) PublicProfile(c *gin.Context) {
+	targetUserID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid user id"})
+		return
+	}
+	profile, err := h.authService.GetVisibleProfile(c.MustGet("userID").(uint64), targetUserID, h.friendRepo)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, profile)
 }
 
 func (h *AuthUserHandler) UpdateMyPublicKey(c *gin.Context) {

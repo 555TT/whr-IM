@@ -97,7 +97,7 @@ func newEngine(
 
 	hub := ws.NewHub()
 	authService := service.NewAuthService(userRepo, "dev-secret")
-	authHandler := handler.NewAuthUserHandler(authService)
+	authHandler := handler.NewAuthUserHandler(authService, friendRepo)
 	wsHandler := handler.NewWebSocketHandler(authService, hub)
 	uploadService := service.NewUploadService(storage)
 	uploadHandler := handler.NewUploadHandler(uploadService)
@@ -115,6 +115,8 @@ func newEngine(
 	authed.Use(middleware.Auth(authService))
 	// GET /api/users/me: 获取当前登录用户的个人信息。
 	authed.GET("/users/me", authHandler.Me)
+	// GET /api/users/:id/profile: 获取当前登录用户可见的指定用户主页资料。
+	authed.GET("/users/:id/profile", authHandler.PublicProfile)
 	// PUT /api/users/me: 更新当前登录用户的昵称、性别、个性签名等资料。
 	authed.PUT("/users/me", authHandler.UpdateMe)
 	// PUT /api/users/me/public-key: 更新当前登录用户的公钥信息，用于端到端加密通信。
@@ -175,6 +177,8 @@ func newEngine(
 			authed.POST("/moments", momentHandler.Create)
 			// GET /api/moments: 获取当前用户可见的朋友圈动态列表。
 			authed.GET("/moments", momentHandler.List)
+			// GET /api/users/:id/moments: 获取当前登录用户可见的指定用户朋友圈列表。
+			authed.GET("/users/:id/moments", momentHandler.ListByUser)
 			// DELETE /api/moments/:id: 删除当前用户自己发布的朋友圈动态。
 			authed.DELETE("/moments/:id", momentHandler.Delete)
 			// POST /api/moments/:id/likes: 给指定朋友圈动态点赞。

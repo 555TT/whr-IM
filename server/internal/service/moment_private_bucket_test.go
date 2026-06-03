@@ -22,6 +22,9 @@ func (s *momentRepoStub) Create(moment *model.Moment) error {
 func (s *momentRepoStub) ListVisibleForUser(userID uint64, friendIDs []uint64) ([]model.Moment, error) {
 	return []model.Moment{*s.created}, nil
 }
+func (s *momentRepoStub) ListByUserID(userID uint64) ([]model.Moment, error) {
+	return []model.Moment{*s.created}, nil
+}
 func (s *momentRepoStub) FindByID(id uint64) (*model.Moment, error)             { return s.created, nil }
 func (s *momentRepoStub) Delete(momentID uint64) error                          { return nil }
 func (s *momentRepoStub) Like(momentID uint64, userID uint64) error             { return nil }
@@ -44,6 +47,9 @@ func (s *friendRepoStub) HandleRequest(requestID uint64, userID uint64, status s
 }
 func (s *friendRepoStub) CreateFriendPair(userID uint64, friendID uint64) error { return nil }
 func (s *friendRepoStub) ListFriends(userID uint64) ([]model.Friend, error)     { return nil, nil }
+func (s *friendRepoStub) AreFriends(userID uint64, friendID uint64) (bool, error) {
+	return true, nil
+}
 
 type userRepoStub struct{}
 

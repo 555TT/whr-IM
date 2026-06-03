@@ -5,6 +5,7 @@ import LoginView from '../views/LoginView.vue';
 import MomentsView from '../views/MomentsView.vue';
 import ProfileView from '../views/ProfileView.vue';
 import RegisterView from '../views/RegisterView.vue';
+import UserHomepageView from '../views/UserHomepageView.vue';
 import { useAuthStore } from '../stores/auth';
 const router = createRouter({
     history: createWebHistory(),
@@ -15,7 +16,8 @@ const router = createRouter({
         { path: '/chat', component: ChatView, meta: { requiresAuth: true } },
         { path: '/moments', component: MomentsView, meta: { requiresAuth: true } },
         { path: '/friend-requests', component: FriendRequestsView, meta: { requiresAuth: true } },
-        { path: '/profile', component: ProfileView, meta: { requiresAuth: true } }
+        { path: '/profile', component: ProfileView, meta: { requiresAuth: true } },
+        { path: '/users/:id', component: UserHomepageView, meta: { requiresAuth: true } }
     ]
 });
 router.beforeEach(async (to) => {
