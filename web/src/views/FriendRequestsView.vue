@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import AppNav from '../components/AppNav.vue'
 import { http } from '../api/http'
+import { resolveHomepageSkin } from '../constants/homepageSkins'
+import { useAuthStore } from '../stores/auth'
 
 interface FriendRequestItem {
   id: number
@@ -13,6 +15,8 @@ interface FriendRequestItem {
   status: string
 }
 
+const authStore = useAuthStore()
+const skin = computed(() => resolveHomepageSkin(authStore.user?.homepageSkin))
 const requests = ref<FriendRequestItem[]>([])
 const toUsername = ref('')
 const note = ref('')
@@ -69,7 +73,7 @@ onMounted(loadRequests)
   <div class="page-shell apple-page">
     <AppNav />
     <section class="requests-layout">
-      <div class="card apple-panel request-form-card">
+      <div class="card apple-panel request-form-card" :class="skin.surfaceClass">
         <p class="apple-label">Add friend</p>
         <h1>发起好友申请</h1>
         <p class="muted">输入目标用户名，并附上一句简短说明。</p>
@@ -80,7 +84,7 @@ onMounted(loadRequests)
         <button class="apple-button" @click="sendRequest">发送申请</button>
       </div>
 
-      <div class="card apple-panel request-list-card">
+      <div class="card apple-panel request-list-card" :class="skin.accentClass">
         <div class="list-head">
           <div>
             <p class="apple-label">Incoming</p>
@@ -115,6 +119,20 @@ onMounted(loadRequests)
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.request-form-card {
+  background: var(--skin-surface, rgba(255, 255, 255, 0.78));
+  color: #fff;
+}
+
+.request-form-card .apple-label,
+.request-form-card .muted {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.request-list-card {
+  box-shadow: 0 12px 28px var(--skin-accent-soft, rgba(15, 23, 42, 0.08));
 }
 
 .request-form-card h1,

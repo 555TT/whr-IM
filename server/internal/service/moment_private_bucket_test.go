@@ -58,7 +58,7 @@ func (s *userRepoStub) FindByUsername(username string) (*model.User, error) { re
 func (s *userRepoStub) FindByID(id uint64) (*model.User, error) {
 	return &model.User{ID: id, Nickname: "alice", Avatar: "avatar"}, nil
 }
-func (s *userRepoStub) UpdateProfile(userID uint64, nickname string, gender int, signature string) (*model.User, error) {
+func (s *userRepoStub) UpdateProfile(userID uint64, nickname string, gender int, signature string, homepageSkin string) (*model.User, error) {
 	return nil, nil
 }
 func (s *userRepoStub) UpdatePublicKey(userID uint64, publicKey string, algorithm string) (*model.User, error) {

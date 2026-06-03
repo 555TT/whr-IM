@@ -14,7 +14,7 @@ type UserRepository interface {
 	Create(user *model.User) error
 	FindByUsername(username string) (*model.User, error)
 	FindByID(id uint64) (*model.User, error)
-	UpdateProfile(userID uint64, nickname string, gender int, signature string) (*model.User, error)
+	UpdateProfile(userID uint64, nickname string, gender int, signature string, homepageSkin string) (*model.User, error)
 	UpdatePublicKey(userID uint64, publicKey string, algorithm string) (*model.User, error)
 }
 
@@ -77,7 +77,7 @@ func (r *InMemoryUserRepository) FindByID(id uint64) (*model.User, error) {
 	return &copyUser, nil
 }
 
-func (r *InMemoryUserRepository) UpdateProfile(userID uint64, nickname string, gender int, signature string) (*model.User, error) {
+func (r *InMemoryUserRepository) UpdateProfile(userID uint64, nickname string, gender int, signature string, homepageSkin string) (*model.User, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -89,6 +89,7 @@ func (r *InMemoryUserRepository) UpdateProfile(userID uint64, nickname string, g
 	user.Nickname = nickname
 	user.Gender = gender
 	user.Signature = signature
+	user.HomepageSkin = homepageSkin
 
 	copyUser := *user
 	return &copyUser, nil

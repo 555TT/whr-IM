@@ -13,9 +13,11 @@ import (
 )
 
 const defaultAvatar = "https://api.dicebear.com/7.x/initials/svg?seed=default-user"
+const defaultHomepageSkin = "aurora"
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrInvalidPublicKey = errors.New("invalid public key update")
+var ErrInvalidHomepageSkin = errors.New("invalid homepage skin")
 var ErrProfileNotVisible = errors.New("profile is not visible to current user")
 
 const supportedPublicKeyAlgorithm = "rsa-oaep-sha256"
@@ -41,9 +43,10 @@ type RegisterInput struct {
 }
 
 type UpdateProfileInput struct {
-	Nickname  string
-	Gender    int
-	Signature string
+	Nickname     string
+	Gender       int
+	Signature    string
+	HomepageSkin string
 }
 
 type UpdatePublicKeyInput struct {
@@ -52,10 +55,11 @@ type UpdatePublicKeyInput struct {
 }
 
 type PublicProfile struct {
-	ID        uint64 `json:"id"`
-	Nickname  string `json:"nickname"`
-	Avatar    string `json:"avatar"`
-	Signature string `json:"signature"`
+	ID           uint64 `json:"id"`
+	Nickname     string `json:"nickname"`
+	Avatar       string `json:"avatar"`
+	Signature    string `json:"signature"`
+	HomepageSkin string `json:"homepageSkin"`
 }
 
 func (s *AuthService) Register(input RegisterInput) (*model.User, error) {
@@ -78,6 +82,7 @@ func (s *AuthService) Register(input RegisterInput) (*model.User, error) {
 		Avatar:             defaultAvatar,
 		Gender:             0,
 		Signature:          "",
+		HomepageSkin:       defaultHomepageSkin,
 		PublicKey:          "",
 		PublicKeyAlgorithm: "",
 	}
@@ -155,15 +160,19 @@ func (s *AuthService) GetVisibleProfile(viewerID uint64, targetUserID uint64, fr
 		return nil, err
 	}
 	return &PublicProfile{
-		ID:        user.ID,
-		Nickname:  user.Nickname,
-		Avatar:    user.Avatar,
-		Signature: user.Signature,
+		ID:           user.ID,
+		Nickname:     user.Nickname,
+		Avatar:       user.Avatar,
+		Signature:    user.Signature,
+		HomepageSkin: user.HomepageSkin,
 	}, nil
 }
 
 func (s *AuthService) UpdateProfile(userID uint64, input UpdateProfileInput) (*model.User, error) {
-	return s.repo.UpdateProfile(userID, input.Nickname, input.Gender, input.Signature)
+	if !isAllowedHomepageSkin(input.HomepageSkin) {
+		return nil, ErrInvalidHomepageSkin
+	}
+	return s.repo.UpdateProfile(userID, input.Nickname, input.Gender, input.Signature, input.HomepageSkin)
 }
 
 func (s *AuthService) UpdatePublicKey(userID uint64, input UpdatePublicKeyInput) (*model.User, error) {
@@ -188,4 +197,13 @@ func validateCredentials(username, password string) error {
 		return fmt.Errorf("password length must be between 6 and 20")
 	}
 	return nil
+}
+
+func isAllowedHomepageSkin(skin string) bool {
+	switch skin {
+	case "aurora", "sunset", "galaxy", "mint", "peach":
+		return true
+	default:
+		return false
+	}
 }

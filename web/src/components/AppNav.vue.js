@@ -1,9 +1,11 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { resolveHomepageSkin } from '../constants/homepageSkins';
 import { useAuthStore } from '../stores/auth';
 const authStore = useAuthStore();
 const router = useRouter();
 const displayName = computed(() => authStore.user?.nickname || authStore.user?.username || '未登录');
+const navSkin = computed(() => resolveHomepageSkin(authStore.user?.homepageSkin));
 function logout() {
     authStore.clearSession();
     router.push('/login');
@@ -29,6 +31,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.nav, __VLS_intrinsicElements.nav)({
     ...{ class: "nav card" },
+    ...{ class: ([__VLS_ctx.navSkin.surfaceClass, __VLS_ctx.navSkin.accentClass]) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "brand" },
@@ -109,6 +112,7 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             displayName: displayName,
+            navSkin: navSkin,
             logout: logout,
         };
     },

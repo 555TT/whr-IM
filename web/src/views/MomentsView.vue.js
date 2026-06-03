@@ -1,10 +1,12 @@
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AppNav from '../components/AppNav.vue';
 import { http } from '../api/http';
+import { resolveHomepageSkin } from '../constants/homepageSkins';
 import { useAuthStore } from '../stores/auth';
 const authStore = useAuthStore();
 const router = useRouter();
+const skin = computed(() => resolveHomepageSkin(authStore.user?.homepageSkin));
 const moments = ref([]);
 const content = ref('');
 const uploadedImageKey = ref('');
@@ -118,6 +120,10 @@ const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['composer-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['moment-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['upload-picker']} */ ;
 /** @type {__VLS_StyleScopedClasses['upload-picker']} */ ;
 /** @type {__VLS_StyleScopedClasses['clickable-name']} */ ;
@@ -136,6 +142,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElemen
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "card apple-panel composer-card" },
+    ...{ class: (__VLS_ctx.skin.surfaceClass) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
     ...{ class: "apple-label" },
@@ -232,6 +239,7 @@ for (const [item] of __VLS_getVForSourceType((__VLS_ctx.moments))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
         key: (item.id),
         ...{ class: "card apple-panel moment-card" },
+        ...{ class: (__VLS_ctx.skin.accentClass) },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "moment-head" },
@@ -394,6 +402,7 @@ const __VLS_self = (await import('vue')).defineComponent({
         return {
             AppNav: AppNav,
             authStore: authStore,
+            skin: skin,
             moments: moments,
             content: content,
             uploadedImageKey: uploadedImageKey,

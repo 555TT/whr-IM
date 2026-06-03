@@ -8,6 +8,7 @@ type User struct {
 	Avatar             string `gorm:"size:255;not null" json:"avatar"`
 	Gender             int    `gorm:"not null;default:0" json:"gender"`
 	Signature          string `gorm:"size:255;not null;default:''" json:"signature"`
+	HomepageSkin       string `gorm:"size:50;not null;default:aurora" json:"homepageSkin"`
 	PublicKey          string `gorm:"type:text;not null" json:"publicKey"`
 	PublicKeyAlgorithm string `gorm:"size:50;not null;default:''" json:"publicKeyAlgorithm"`
 }

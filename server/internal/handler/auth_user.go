@@ -32,9 +32,10 @@ type loginRequest struct {
 }
 
 type updateProfileRequest struct {
-	Nickname  string `json:"nickname"`
-	Gender    int    `json:"gender"`
-	Signature string `json:"signature"`
+	Nickname     string `json:"nickname"`
+	Gender       int    `json:"gender"`
+	Signature    string `json:"signature"`
+	HomepageSkin string `json:"homepageSkin"`
 }
 
 type updatePublicKeyRequest struct {
@@ -106,12 +107,17 @@ func (h *AuthUserHandler) UpdateMe(c *gin.Context) {
 
 	userID := c.MustGet("userID").(uint64)
 	user, err := h.authService.UpdateProfile(userID, service.UpdateProfileInput{
-		Nickname:  req.Nickname,
-		Gender:    req.Gender,
-		Signature: req.Signature,
+		Nickname:     req.Nickname,
+		Gender:       req.Gender,
+		Signature:    req.Signature,
+		HomepageSkin: req.HomepageSkin,
 	})
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"message": err.Error()})
+		status := http.StatusNotFound
+		if errors.Is(err, service.ErrInvalidHomepageSkin) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"message": err.Error()})
 		return
 	}
 

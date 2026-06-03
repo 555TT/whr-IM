@@ -177,3 +177,38 @@ a {
   color: #6e6e73;
   font-size: 15px;
 }
+
+.theme-aurora {
+  --skin-accent: #2193b0;
+  --skin-accent-soft: rgba(33, 147, 176, 0.14);
+  --skin-surface: linear-gradient(135deg, #6dd5ed 0%, #2193b0 100%);
+  --skin-surface-plain: rgba(109, 213, 237, 0.14);
+}
+
+.theme-sunset {
+  --skin-accent: #ec4899;
+  --skin-accent-soft: rgba(236, 72, 153, 0.14);
+  --skin-surface: linear-gradient(135deg, #f97316 0%, #ec4899 100%);
+  --skin-surface-plain: rgba(249, 115, 22, 0.14);
+}
+
+.theme-galaxy {
+  --skin-accent: #7c3aed;
+  --skin-accent-soft: rgba(124, 58, 237, 0.16);
+  --skin-surface: linear-gradient(135deg, #312e81 0%, #7c3aed 55%, #ec4899 100%);
+  --skin-surface-plain: rgba(124, 58, 237, 0.14);
+}
+
+.theme-mint {
+  --skin-accent: #14b8a6;
+  --skin-accent-soft: rgba(20, 184, 166, 0.14);
+  --skin-surface: linear-gradient(135deg, #34d399 0%, #14b8a6 100%);
+  --skin-surface-plain: rgba(52, 211, 153, 0.14);
+}
+
+.theme-peach {
+  --skin-accent: #fb7185;
+  --skin-accent-soft: rgba(251, 113, 133, 0.14);
+  --skin-surface: linear-gradient(135deg, #fb7185 0%, #fdba74 100%);
+  --skin-surface-plain: rgba(251, 113, 133, 0.14);
+}

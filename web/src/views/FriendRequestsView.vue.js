@@ -1,6 +1,10 @@
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import AppNav from '../components/AppNav.vue';
 import { http } from '../api/http';
+import { resolveHomepageSkin } from '../constants/homepageSkins';
+import { useAuthStore } from '../stores/auth';
+const authStore = useAuthStore();
+const skin = computed(() => resolveHomepageSkin(authStore.user?.homepageSkin));
 const requests = ref([]);
 const toUsername = ref('');
 const note = ref('');
@@ -55,6 +59,10 @@ const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['request-form-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['request-form-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['request-form-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['request-list-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['request-form-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['request-list-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['requests-layout']} */ ;
 /** @type {__VLS_StyleScopedClasses['request-row']} */ ;
@@ -72,6 +80,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElemen
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "card apple-panel request-form-card" },
+    ...{ class: (__VLS_ctx.skin.surfaceClass) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
     ...{ class: "apple-label" },
@@ -108,6 +117,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "card apple-panel request-list-card" },
+    ...{ class: (__VLS_ctx.skin.accentClass) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "list-head" },
@@ -183,6 +193,7 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             AppNav: AppNav,
+            skin: skin,
             requests: requests,
             toUsername: toUsername,
             note: note,

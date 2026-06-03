@@ -9,6 +9,7 @@ export interface CurrentUser {
   avatar: string
   gender?: number
   signature?: string
+  homepageSkin?: string
   publicKey?: string
   publicKeyAlgorithm?: string
 }

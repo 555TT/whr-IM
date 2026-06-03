@@ -21,6 +21,7 @@ CREATE TABLE users (
     avatar VARCHAR(255) NOT NULL DEFAULT 'https://api.dicebear.com/7.x/initials/svg?seed=default-user' COMMENT '系统默认头像地址，不允许用户修改',
     gender TINYINT NOT NULL DEFAULT 0 COMMENT '性别：0-未知，1-男，2-女',
     signature VARCHAR(255) NOT NULL DEFAULT '' COMMENT '个性签名',
+    homepage_skin VARCHAR(50) NOT NULL DEFAULT 'aurora' COMMENT '主页预设皮肤标识',
     public_key TEXT NOT NULL COMMENT '用户公钥',
     public_key_algorithm VARCHAR(50) NOT NULL DEFAULT '' COMMENT '公钥算法',
     PRIMARY KEY (id),

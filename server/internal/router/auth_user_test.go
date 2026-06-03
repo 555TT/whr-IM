@@ -33,6 +33,7 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 			Username           string `json:"username"`
 			Nickname           string `json:"nickname"`
 			Avatar             string `json:"avatar"`
+			HomepageSkin       string `json:"homepageSkin"`
 			PublicKey          string `json:"publicKey"`
 			PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
 		} `json:"user"`
@@ -55,6 +56,9 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	}
 	if registerResp.User.PublicKeyAlgorithm != "" {
 		t.Fatalf("expected empty publicKeyAlgorithm on register, got %q", registerResp.User.PublicKeyAlgorithm)
+	}
+	if registerResp.User.HomepageSkin != "aurora" {
+		t.Fatalf("expected default homepageSkin aurora, got %q", registerResp.User.HomepageSkin)
 	}
 
 	loginBody := []byte(`{"username":"alice","password":"secret123"}`)
@@ -104,6 +108,7 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 		Nickname           string `json:"nickname"`
 		Avatar             string `json:"avatar"`
 		Signature          string `json:"signature"`
+		HomepageSkin       string `json:"homepageSkin"`
 		PublicKey          string `json:"publicKey"`
 		PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
 	}
@@ -113,6 +118,9 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	if meResp.Username != "alice" {
 		t.Fatalf("expected me username alice, got %q", meResp.Username)
 	}
+	if meResp.HomepageSkin != "aurora" {
+		t.Fatalf("expected default homepageSkin aurora in profile, got %q", meResp.HomepageSkin)
+	}
 	if meResp.PublicKey != "" {
 		t.Fatalf("expected empty publicKey in profile, got %q", meResp.PublicKey)
 	}
@@ -120,7 +128,7 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 		t.Fatalf("expected empty publicKeyAlgorithm in profile, got %q", meResp.PublicKeyAlgorithm)
 	}
 
-	updateFemaleBody := []byte(`{"nickname":"Alice","gender":0,"signature":"hello im"}`)
+	updateFemaleBody := []byte(`{"nickname":"Alice","gender":0,"signature":"hello im","homepageSkin":"sunset"}`)
 	updateFemaleReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader(updateFemaleBody))
 	updateFemaleReq.Header.Set("Content-Type", "application/json")
 	updateFemaleReq.Header.Set("Authorization", "Bearer "+loginResp.Token)
@@ -137,6 +145,7 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 		Gender             int    `json:"gender"`
 		Signature          string `json:"signature"`
 		Avatar             string `json:"avatar"`
+		HomepageSkin       string `json:"homepageSkin"`
 		PublicKey          string `json:"publicKey"`
 		PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
 	}
@@ -155,6 +164,9 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	if updateFemaleResp.Avatar == "" {
 		t.Fatal("expected avatar to remain populated")
 	}
+	if updateFemaleResp.HomepageSkin != "sunset" {
+		t.Fatalf("expected homepageSkin sunset, got %q", updateFemaleResp.HomepageSkin)
+	}
 	if updateFemaleResp.PublicKey != "" {
 		t.Fatalf("expected publicKey to remain empty after profile update, got %q", updateFemaleResp.PublicKey)
 	}
@@ -162,7 +174,7 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 		t.Fatalf("expected publicKeyAlgorithm to remain empty after profile update, got %q", updateFemaleResp.PublicKeyAlgorithm)
 	}
 
-	updateMaleBody := []byte(`{"nickname":"Alice","gender":1,"signature":"hello im"}`)
+	updateMaleBody := []byte(`{"nickname":"Alice","gender":1,"signature":"hello im","homepageSkin":"galaxy"}`)
 	updateMaleReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader(updateMaleBody))
 	updateMaleReq.Header.Set("Content-Type", "application/json")
 	updateMaleReq.Header.Set("Authorization", "Bearer "+loginResp.Token)
@@ -176,6 +188,7 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 
 	var updateMaleResp struct {
 		Gender             int    `json:"gender"`
+		HomepageSkin       string `json:"homepageSkin"`
 		PublicKey          string `json:"publicKey"`
 		PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
 	}
@@ -185,11 +198,31 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	if updateMaleResp.Gender != 1 {
 		t.Fatalf("expected updated gender 1 for male, got %d", updateMaleResp.Gender)
 	}
+	if updateMaleResp.HomepageSkin != "galaxy" {
+		t.Fatalf("expected updated homepageSkin galaxy, got %q", updateMaleResp.HomepageSkin)
+	}
 	if updateMaleResp.PublicKey != "" {
 		t.Fatalf("expected publicKey to remain empty after second profile update, got %q", updateMaleResp.PublicKey)
 	}
 	if updateMaleResp.PublicKeyAlgorithm != "" {
 		t.Fatalf("expected publicKeyAlgorithm to remain empty after second profile update, got %q", updateMaleResp.PublicKeyAlgorithm)
+	}
+}
+
+func TestUserCannotUpdateHomepageSkinWithInvalidValue(t *testing.T) {
+	r := newTestRouter(t)
+	token := registerAndLogin(t, r, "alice")
+
+	updateBody := []byte(`{"nickname":"Alice","gender":0,"signature":"hello","homepageSkin":"hacker-neon"}`)
+	updateReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader(updateBody))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("Authorization", "Bearer "+token)
+	updateW := httptest.NewRecorder()
+
+	r.ServeHTTP(updateW, updateReq)
+
+	if updateW.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid homepageSkin status 400, got %d with body %s", updateW.Code, updateW.Body.String())
 	}
 }
 

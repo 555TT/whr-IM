@@ -188,12 +188,30 @@ func TestUserHomepageProfileAccessControl(t *testing.T) {
 		t.Fatalf("expected accept status 200, got %d with body %s", acceptW.Code, acceptW.Body.String())
 	}
 
+	updateProfileReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader([]byte(`{"nickname":"Alice","gender":0,"signature":"hello im","homepageSkin":"sunset"}`)))
+	updateProfileReq.Header.Set("Content-Type", "application/json")
+	updateProfileReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	updateProfileW := httptest.NewRecorder()
+	r.ServeHTTP(updateProfileW, updateProfileReq)
+	if updateProfileW.Code != http.StatusOK {
+		t.Fatalf("expected update profile status 200, got %d with body %s", updateProfileW.Code, updateProfileW.Body.String())
+	}
+
 	selfReq := httptest.NewRequest(http.MethodGet, "/api/users/1/profile", nil)
 	selfReq.Header.Set("Authorization", "Bearer "+aliceToken)
 	selfW := httptest.NewRecorder()
 	r.ServeHTTP(selfW, selfReq)
 	if selfW.Code != http.StatusOK {
 		t.Fatalf("expected self homepage profile status 200, got %d with body %s", selfW.Code, selfW.Body.String())
+	}
+	var selfProfileResp struct {
+		HomepageSkin string `json:"homepageSkin"`
+	}
+	if err := json.Unmarshal(selfW.Body.Bytes(), &selfProfileResp); err != nil {
+		t.Fatalf("expected valid self homepage profile json, got error: %v", err)
+	}
+	if selfProfileResp.HomepageSkin != "sunset" {
+		t.Fatalf("expected self homepageSkin sunset, got %q", selfProfileResp.HomepageSkin)
 	}
 
 	friendReq := httptest.NewRequest(http.MethodGet, "/api/users/1/profile", nil)
@@ -202,6 +220,15 @@ func TestUserHomepageProfileAccessControl(t *testing.T) {
 	r.ServeHTTP(friendW, friendReq)
 	if friendW.Code != http.StatusOK {
 		t.Fatalf("expected friend homepage profile status 200, got %d with body %s", friendW.Code, friendW.Body.String())
+	}
+	var friendProfileResp struct {
+		HomepageSkin string `json:"homepageSkin"`
+	}
+	if err := json.Unmarshal(friendW.Body.Bytes(), &friendProfileResp); err != nil {
+		t.Fatalf("expected valid friend homepage profile json, got error: %v", err)
+	}
+	if friendProfileResp.HomepageSkin != "sunset" {
+		t.Fatalf("expected friend-visible homepageSkin sunset, got %q", friendProfileResp.HomepageSkin)
 	}
 
 	strangerReq := httptest.NewRequest(http.MethodGet, "/api/users/1/profile", nil)

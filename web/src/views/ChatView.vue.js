@@ -3,12 +3,14 @@ import AppNav from '../components/AppNav.vue';
 import CreateGroupModal from '../components/CreateGroupModal.vue';
 import GroupInfoPanel from '../components/GroupInfoPanel.vue';
 import { http } from '../api/http';
+import { resolveHomepageSkin } from '../constants/homepageSkins';
 import { useAuthStore } from '../stores/auth';
 import { formatChatMessageTime } from '../utils/chat-time';
 import { buildEncryptedMessageDisplay, decryptMessage, E2EE_MESSAGE_ALGORITHM, encryptMessage, exportPrivateKey, exportPublicKey, generateKeyPair, importPrivateKey, importPublicKey, loadPrivateKey, savePrivateKey, selectMessagePayloadForUser } from '../utils/e2ee';
 import { buildGroupMessageEnvelope, decryptGroupMessage } from '../utils/group-e2ee';
 import { createChatSocket } from '../utils/websocket';
 const authStore = useAuthStore();
+const skin = computed(() => resolveHomepageSkin(authStore.user?.homepageSkin));
 const friends = ref([]);
 const groups = ref([]);
 const messages = ref([]);
@@ -400,6 +402,7 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['chat-theme-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar-top']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-top']} */ ;
 /** @type {__VLS_StyleScopedClasses['friend-item']} */ ;
@@ -438,7 +441,8 @@ let __VLS_directives;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "page-shell apple-page" },
+    ...{ class: "page-shell apple-page chat-theme-shell" },
+    ...{ class: (__VLS_ctx.skin.surfaceClass) },
 });
 /** @type {[typeof AppNav, ]} */ ;
 // @ts-ignore
@@ -724,6 +728,7 @@ const __VLS_19 = {
 var __VLS_13;
 /** @type {__VLS_StyleScopedClasses['page-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-page']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-theme-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar']} */ ;
@@ -777,6 +782,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             GroupInfoPanel: GroupInfoPanel,
             formatChatMessageTime: formatChatMessageTime,
             authStore: authStore,
+            skin: skin,
             friends: friends,
             groups: groups,
             messages: messages,

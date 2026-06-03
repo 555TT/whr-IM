@@ -52,11 +52,12 @@ func (r *GormUserRepository) FindByID(id uint64) (*model.User, error) {
 	return &user, nil
 }
 
-func (r *GormUserRepository) UpdateProfile(userID uint64, nickname string, gender int, signature string) (*model.User, error) {
+func (r *GormUserRepository) UpdateProfile(userID uint64, nickname string, gender int, signature string, homepageSkin string) (*model.User, error) {
 	updates := map[string]interface{}{
-		"nickname":  nickname,
-		"gender":    gender,
-		"signature": signature,
+		"nickname":      nickname,
+		"gender":        gender,
+		"signature":     signature,
+		"homepage_skin": homepageSkin,
 	}
 	result := r.db.Model(&model.User{}).Where("id = ?", userID).Updates(updates)
 	if result.Error != nil {

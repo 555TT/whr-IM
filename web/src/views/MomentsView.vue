@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import AppNav from '../components/AppNav.vue'
 import { http } from '../api/http'
+import { resolveHomepageSkin } from '../constants/homepageSkins'
 import { useAuthStore } from '../stores/auth'
 
 interface MomentCommentItem {
@@ -34,6 +35,7 @@ interface UploadResponse {
 
 const authStore = useAuthStore()
 const router = useRouter()
+const skin = computed(() => resolveHomepageSkin(authStore.user?.homepageSkin))
 const moments = ref<MomentItem[]>([])
 const content = ref('')
 const uploadedImageKey = ref('')
@@ -146,7 +148,7 @@ onMounted(loadMoments)
   <div class="page-shell apple-page">
     <AppNav />
     <section class="moments-layout">
-      <div class="card apple-panel composer-card">
+      <div class="card apple-panel composer-card" :class="skin.surfaceClass">
         <p class="apple-label">Moments</p>
         <h1>朋友圈</h1>
         <p class="muted">可选择一张图片后再发布动态。</p>
@@ -176,7 +178,7 @@ onMounted(loadMoments)
 
       <div class="feed-column">
         <div v-if="moments.length === 0" class="card apple-panel empty-state-card">暂无动态</div>
-        <article v-for="item in moments" :key="item.id" class="card apple-panel moment-card">
+        <article v-for="item in moments" :key="item.id" class="card apple-panel moment-card" :class="skin.accentClass">
           <div class="moment-head">
             <img :src="item.avatar" alt="avatar" class="avatar clickable-avatar" @click="openHomepage(item.userId)" />
             <div>
@@ -236,6 +238,20 @@ onMounted(loadMoments)
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.composer-card {
+  background: var(--skin-surface, rgba(255, 255, 255, 0.78));
+  color: #fff;
+}
+
+.composer-card .apple-label,
+.composer-card .muted {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.moment-card {
+  box-shadow: 0 12px 28px var(--skin-accent-soft, rgba(15, 23, 42, 0.08));
 }
 
 .composer-card h1 {

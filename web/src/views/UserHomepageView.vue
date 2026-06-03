@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 import AppNav from '../components/AppNav.vue'
 import { http } from '../api/http'
+import { resolveHomepageSkin } from '../constants/homepageSkins'
 import { useAuthStore } from '../stores/auth'
 
 interface PublicProfile {
@@ -11,6 +12,7 @@ interface PublicProfile {
   nickname: string
   avatar: string
   signature: string
+  homepageSkin: string
 }
 
 interface MomentCommentItem {
@@ -104,6 +106,10 @@ async function deleteMoment(item: MomentItem) {
   }
 }
 
+function homepageSkinClass() {
+  return resolveHomepageSkin(profile.value?.homepageSkin).surfaceClass
+}
+
 watch(() => route.params.id, loadHomepage)
 onMounted(loadHomepage)
 </script>
@@ -112,7 +118,7 @@ onMounted(loadHomepage)
   <div class="page-shell apple-page">
     <AppNav />
     <section class="homepage-layout">
-      <div class="card apple-panel homepage-profile" v-if="profile">
+      <div class="card apple-panel homepage-profile" :class="homepageSkinClass()" v-if="profile">
         <div class="profile-top">
           <img :src="profile.avatar" alt="avatar" class="homepage-avatar" />
           <div>
@@ -191,6 +197,13 @@ onMounted(loadHomepage)
   gap: 14px;
 }
 
+.homepage-profile {
+  color: #fff;
+  overflow: hidden;
+  background: var(--skin-surface, rgba(255, 255, 255, 0.78));
+}
+
+
 .profile-top {
   display: flex;
   align-items: center;
@@ -209,6 +222,11 @@ onMounted(loadHomepage)
   margin: 6px 0 8px;
   font-size: 34px;
   letter-spacing: -0.03em;
+}
+
+.homepage-profile .apple-label,
+.homepage-profile .muted {
+  color: rgba(255, 255, 255, 0.86);
 }
 
 .feed-column {

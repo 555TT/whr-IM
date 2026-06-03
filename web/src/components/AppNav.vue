@@ -2,12 +2,14 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { resolveHomepageSkin } from '../constants/homepageSkins'
 import { useAuthStore } from '../stores/auth'
 
 const authStore = useAuthStore()
 const router = useRouter()
 
 const displayName = computed(() => authStore.user?.nickname || authStore.user?.username || '未登录')
+const navSkin = computed(() => resolveHomepageSkin(authStore.user?.homepageSkin))
 
 function logout() {
   authStore.clearSession()
@@ -17,7 +19,7 @@ function logout() {
 
 <template>
   <div class="nav-wrap">
-    <nav class="nav card">
+    <nav class="nav card" :class="[navSkin.surfaceClass, navSkin.accentClass]">
       <div class="brand">
         <span class="brand-dot"></span>
         <span>Easy Chat</span>
@@ -47,6 +49,8 @@ function logout() {
   justify-content: space-between;
   gap: 16px;
   padding: 16px 22px;
+  background: var(--skin-surface, rgba(255, 255, 255, 0.78));
+  color: #fff;
 }
 
 .brand {
@@ -74,20 +78,20 @@ function logout() {
 .nav a {
   padding: 10px 14px;
   border-radius: 999px;
-  color: #6e6e73;
+  color: rgba(255, 255, 255, 0.86);
   text-decoration: none;
   font-weight: 600;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
 .nav a.router-link-active {
-  background: rgba(0, 113, 227, 0.1);
-  color: #0071e3;
+  background: var(--skin-accent-soft, rgba(0, 113, 227, 0.1));
+  color: #fff;
 }
 
 .nav a:hover {
-  background: rgba(29, 29, 31, 0.05);
-  color: #1d1d1f;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
 }
 
 .nav-user {
@@ -97,7 +101,7 @@ function logout() {
 }
 
 .nav-user-name {
-  color: #6e6e73;
+  color: rgba(255, 255, 255, 0.86);
   font-size: 14px;
 }
 
@@ -105,8 +109,8 @@ function logout() {
   border: none;
   border-radius: 999px;
   padding: 10px 14px;
-  background: rgba(29, 29, 31, 0.06);
-  color: #1d1d1f;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
   cursor: pointer;
 }
 

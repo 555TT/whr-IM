@@ -5,6 +5,7 @@ import AppNav from '../components/AppNav.vue'
 import CreateGroupModal from '../components/CreateGroupModal.vue'
 import GroupInfoPanel from '../components/GroupInfoPanel.vue'
 import { http } from '../api/http'
+import { resolveHomepageSkin } from '../constants/homepageSkins'
 import { useAuthStore } from '../stores/auth'
 import { formatChatMessageTime } from '../utils/chat-time'
 import {
@@ -102,6 +103,7 @@ interface RenderMessage {
 type ConversationType = 'friend' | 'group'
 
 const authStore = useAuthStore()
+const skin = computed(() => resolveHomepageSkin(authStore.user?.homepageSkin))
 const friends = ref<FriendItem[]>([])
 const groups = ref<GroupListItem[]>([])
 const messages = ref<RenderMessage[]>([])
@@ -525,7 +527,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="page-shell apple-page">
+  <div class="page-shell apple-page chat-theme-shell" :class="skin.surfaceClass">
     <AppNav />
     <section
       class="chat-shell card"
@@ -669,7 +671,22 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.chat-theme-shell {
+  position: relative;
+}
+
+.chat-theme-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at top right, var(--skin-accent-soft, rgba(0, 113, 227, 0.1)), transparent 45%);
+  pointer-events: none;
+  z-index: 0;
+}
+
 .chat-shell {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 340px 1fr;
   min-height: 760px;
