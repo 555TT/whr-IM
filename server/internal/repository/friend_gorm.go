@@ -14,6 +14,7 @@ type FriendRepository interface {
 	HandleRequest(requestID uint64, userID uint64, status string) (*model.FriendRequest, error)
 	CreateFriendPair(userID uint64, friendID uint64) error
 	ListFriends(userID uint64) ([]model.Friend, error)
+	AreFriends(userID uint64, friendID uint64) (bool, error)
 }
 
 type GormFriendRepository struct {
@@ -72,4 +73,12 @@ func (r *GormFriendRepository) ListFriends(userID uint64) ([]model.Friend, error
 		return nil, err
 	}
 	return friends, nil
+}
+
+func (r *GormFriendRepository) AreFriends(userID uint64, friendID uint64) (bool, error) {
+	var count int64
+	if err := r.db.Model(&model.Friend{}).Where("user_id = ? AND friend_id = ?", userID, friendID).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

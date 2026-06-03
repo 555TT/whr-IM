@@ -119,6 +119,50 @@ func TestFriendRequestAcceptAndFriendsListFlow(t *testing.T) {
 	}
 }
 
+func TestFriendRequestRejectsExistingFriend(t *testing.T) {
+	r := newTestRouter(t)
+
+	aliceToken := registerAndLogin(t, r, "alice")
+	bobToken := registerAndLogin(t, r, "bobby")
+
+	requestBody := []byte(`{"toUsername":"bobby","message":"add me"}`)
+	requestReq := httptest.NewRequest(http.MethodPost, "/api/friend-requests", bytes.NewReader(requestBody))
+	requestReq.Header.Set("Content-Type", "application/json")
+	requestReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	requestW := httptest.NewRecorder()
+	r.ServeHTTP(requestW, requestReq)
+	if requestW.Code != http.StatusCreated {
+		t.Fatalf("expected friend request status 201, got %d", requestW.Code)
+	}
+
+	acceptReq := httptest.NewRequest(http.MethodPut, "/api/friend-requests/1/accept", nil)
+	acceptReq.Header.Set("Authorization", "Bearer "+bobToken)
+	acceptW := httptest.NewRecorder()
+	r.ServeHTTP(acceptW, acceptReq)
+	if acceptW.Code != http.StatusOK {
+		t.Fatalf("expected accept status 200, got %d with body %s", acceptW.Code, acceptW.Body.String())
+	}
+
+	repeatReq := httptest.NewRequest(http.MethodPost, "/api/friend-requests", bytes.NewReader(requestBody))
+	repeatReq.Header.Set("Content-Type", "application/json")
+	repeatReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	repeatW := httptest.NewRecorder()
+	r.ServeHTTP(repeatW, repeatReq)
+	if repeatW.Code != http.StatusBadRequest {
+		t.Fatalf("expected existing friend request status 400, got %d with body %s", repeatW.Code, repeatW.Body.String())
+	}
+
+	var errorResp struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(repeatW.Body.Bytes(), &errorResp); err != nil {
+		t.Fatalf("expected valid error response json, got error: %v", err)
+	}
+	if errorResp.Message != "对方已经是你的好友" {
+		t.Fatalf("expected existing friend message, got %q", errorResp.Message)
+	}
+}
+
 func TestFriendRequestCanBeRejected(t *testing.T) {
 	r := newTestRouter(t)
 

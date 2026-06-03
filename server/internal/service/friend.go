@@ -1,11 +1,14 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 
 	"whr-im/server/internal/model"
 	"whr-im/server/internal/repository"
 )
+
+var ErrAlreadyFriends = errors.New("对方已经是你的好友")
 
 type FriendService struct {
 	friendRepo repository.FriendRepository
@@ -47,6 +50,13 @@ func (s *FriendService) CreateRequest(fromUserID uint64, input CreateFriendReque
 	}
 	if fromUserID == targetUser.ID {
 		return nil, fmt.Errorf("cannot add yourself")
+	}
+	alreadyFriends, err := s.friendRepo.AreFriends(fromUserID, targetUser.ID)
+	if err != nil {
+		return nil, err
+	}
+	if alreadyFriends {
+		return nil, ErrAlreadyFriends
 	}
 	request := &model.FriendRequest{FromUserID: fromUserID, ToUserID: targetUser.ID, Message: input.Message, Status: "pending"}
 	if err := s.friendRepo.CreateRequest(request); err != nil {
