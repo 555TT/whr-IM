@@ -893,8 +893,79 @@ def gen_fig_4_12():
     save(fig, "图4-12_好友关系模块类图.png")
 
 
+# ---------------------------------------------------------------------------
+# 图 3-2 普通用户用例图
+# ---------------------------------------------------------------------------
+def gen_fig_3_2():
+    fig, ax = plt.subplots(figsize=(14, 11))
+    ax.set_xlim(0, 14); ax.set_ylim(0, 11); ax.axis("off")
+
+    # actor — 火柴人
+    ax_cx, ax_cy = 1.4, 5.5
+    # 头
+    head = Circle((ax_cx, ax_cy + 1.2), 0.28, fill=False, linewidth=1.6, edgecolor=C_LINE)
+    ax.add_patch(head)
+    # 身体
+    ax.plot([ax_cx, ax_cx], [ax_cy + 0.9, ax_cy - 0.3], color=C_LINE, lw=1.6)
+    # 手臂
+    ax.plot([ax_cx - 0.6, ax_cx + 0.6], [ax_cy + 0.45, ax_cy + 0.45], color=C_LINE, lw=1.6)
+    # 腿
+    ax.plot([ax_cx, ax_cx - 0.5], [ax_cy - 0.3, ax_cy - 1.2], color=C_LINE, lw=1.6)
+    ax.plot([ax_cx, ax_cx + 0.5], [ax_cy - 0.3, ax_cy - 1.2], color=C_LINE, lw=1.6)
+    ax.text(ax_cx, ax_cy - 1.6, "普通用户", ha="center", va="center", fontsize=FS)
+
+    # 系统边界
+    sys_x, sys_y, sys_w, sys_h = 3.4, 0.4, 10.2, 10.2
+    rect_sys = Rectangle((sys_x, sys_y), sys_w, sys_h, linewidth=1.4,
+                         edgecolor=C_HEAD, facecolor="#FAFCFF")
+    ax.add_patch(rect_sys)
+    ax.text(sys_x + sys_w / 2, sys_y + sys_h - 0.25,
+            "IM 即时通讯系统", ha="center", va="center",
+            fontsize=FS, fontweight="bold", color=C_HEAD)
+
+    # 用例(椭圆)
+    use_cases = [
+        # (cx, cy, label)
+        (5.0, 9.4, "注册账号"),
+        (8.2, 9.4, "登录系统"),
+        (11.3, 9.4, "上传公钥"),
+        (5.0, 8.4, "查看个人资料"),
+        (8.2, 8.4, "修改个人资料"),
+        (11.3, 8.4, "切换主页皮肤"),
+        (5.0, 7.4, "发起好友申请"),
+        (8.2, 7.4, "处理好友申请"),
+        (11.3, 7.4, "查看好友列表"),
+        (5.0, 6.4, "查看好友主页"),
+        (8.2, 6.4, "发送单聊消息"),
+        (11.3, 6.4, "查看单聊历史"),
+        (5.0, 5.4, "创建群聊"),
+        (8.2, 5.4, "邀请好友入群"),
+        (11.3, 5.4, "退出群聊"),
+        (5.0, 4.4, "发送群聊消息"),
+        (8.2, 4.4, "查看群聊历史"),
+        (11.3, 4.4, "上传朋友圈图片"),
+        (5.0, 3.4, "发布朋友圈"),
+        (8.2, 3.4, "浏览朋友圈时间线"),
+        (11.3, 3.4, "点赞 / 取消点赞"),
+        (5.0, 2.4, "评论朋友圈"),
+        (8.2, 2.4, "删除朋友圈"),
+        (11.3, 2.4, "调用 AI 文案助手"),
+        (8.2, 1.3, "本地端到端加解密"),
+    ]
+    for cx, cy, label in use_cases:
+        ellipse(ax, cx, cy, 2.6, 0.65, label, color=C_BLOCK, edge=C_HEAD, fontsize=FS)
+
+    # actor → 关键用例 的关联线 (画几条代表性的关联)
+    for cx, cy, _ in use_cases:
+        ax.plot([ax_cx + 0.3, cx - 1.3], [ax_cy + 0.45, cy],
+                color="#999", lw=0.6, alpha=0.6)
+
+    save(fig, "图3-2_普通用户用例图.png")
+
+
 if __name__ == "__main__":
     gen_fig_3_1()
+    gen_fig_3_2()
     gen_fig_4_1()
     gen_fig_4_2()
     gen_fig_4_3()
