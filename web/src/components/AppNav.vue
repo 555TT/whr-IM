@@ -21,16 +21,20 @@ function logout() {
   <div class="nav-wrap">
     <nav class="nav card" :class="[navSkin.surfaceClass, navSkin.accentClass]">
       <div class="brand">
-        <span class="brand-dot"></span>
-        <span>Easy Chat</span>
+        <span class="brand-badge">IM</span>
+        <div class="brand-copy">
+          <strong>Easy Chat IM</strong>
+          <small>即时通讯 / 实时会话 / 群组消息</small>
+        </div>
       </div>
       <div class="nav-links">
-        <router-link to="/chat">聊天</router-link>
+        <router-link to="/chat">消息中心</router-link>
         <router-link to="/moments">朋友圈</router-link>
-        <router-link to="/friend-requests">好友申请</router-link>
-        <router-link to="/profile">个人资料</router-link>
+        <router-link to="/friend-requests">通讯录申请</router-link>
+        <router-link to="/profile">我的名片</router-link>
       </div>
       <div class="nav-user">
+        <span class="nav-user-status">● 已登录</span>
         <span class="nav-user-name">{{ displayName }}</span>
         <button class="logout-btn" @click="logout">退出</button>
       </div>
@@ -56,17 +60,41 @@ function logout() {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-weight: 700;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.brand-copy strong {
+  font-size: 17px;
+  line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
-.brand-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: linear-gradient(180deg, #47b1ff 0%, #0071e3 100%);
-  box-shadow: 0 0 12px rgba(0, 113, 227, 0.35);
+.brand-copy small {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .nav-links {
@@ -98,6 +126,14 @@ function logout() {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.nav-user-status {
+  color: #92ffb0;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .nav-user-name {
@@ -124,7 +160,16 @@ function logout() {
     padding: 12px 14px;
   }
   .brand {
+    width: 100%;
+  }
+
+  .brand-copy strong {
     font-size: 15px;
+  }
+
+  .brand-copy small {
+    font-size: 11px;
+    white-space: normal;
   }
   .nav-links {
     order: 3;

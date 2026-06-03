@@ -30,6 +30,14 @@ const showCreateGroup = ref(false);
 const showGroupInfo = ref(false);
 let socket = null;
 const currentFriend = computed(() => friends.value.find((item) => item.friendId === currentFriendId.value) || null);
+const totalConversationCount = computed(() => friends.value.length + groups.value.length);
+const currentConversationHint = computed(() => {
+    if (conversationType.value === 'friend')
+        return currentFriend.value?.signature || '单聊会话已开启';
+    if (conversationType.value === 'group')
+        return currentGroupDetail.value ? `${currentGroupDetail.value.members.length} 位成员参与会话` : '群组会话已开启';
+    return '选择联系人后可开始发送实时消息';
+});
 // 当前在聊会话(群或好友)的展示标题
 const conversationTitle = computed(() => {
     if (conversationType.value === 'friend')
@@ -403,8 +411,19 @@ const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['chat-theme-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['sidebar-banner']} */ ;
+/** @type {__VLS_StyleScopedClasses['signal-pill']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar-top']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-top']} */ ;
+/** @type {__VLS_StyleScopedClasses['sidebar-top']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-top-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-top-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-top-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-top-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-top-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-top-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-empty-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-empty-state']} */ ;
 /** @type {__VLS_StyleScopedClasses['friend-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['friend-avatar']} */ ;
 /** @type {__VLS_StyleScopedClasses['tab-btn']} */ ;
@@ -418,6 +437,10 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['message-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-shell']} */ ;
@@ -430,14 +453,21 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['chat-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar-top']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-top']} */ ;
+/** @type {__VLS_StyleScopedClasses['sidebar-banner']} */ ;
+/** @type {__VLS_StyleScopedClasses['sidebar-banner']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-top']} */ ;
 /** @type {__VLS_StyleScopedClasses['back-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-top-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-empty-state']} */ ;
 /** @type {__VLS_StyleScopedClasses['messages']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['friend-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['composer']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['composer']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['composer']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -456,17 +486,33 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements
     ...{ class: "sidebar" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "sidebar-top" },
+    ...{ class: "sidebar-banner" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
     ...{ class: "apple-label" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "sidebar-banner-copy" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "signal-pill" },
+    ...{ class: ({ online: __VLS_ctx.socketConnected }) },
+});
+(__VLS_ctx.socketConnected ? '消息通道已连接' : '消息通道连接中');
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "sidebar-top" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "apple-label" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({
     ...{ class: "muted" },
 });
-(__VLS_ctx.socketConnected ? '在线同步中' : '等待连接');
+(__VLS_ctx.totalConversationCount);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "sidebar-tabs" },
 });
@@ -572,9 +618,13 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
     ...{ class: "apple-label" },
 });
-(__VLS_ctx.conversationType === 'group' ? 'Group' : 'Conversation');
+(__VLS_ctx.conversationType === 'group' ? 'Group Chat' : 'Direct Message');
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({});
 (__VLS_ctx.conversationTitle);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({
+    ...{ class: "muted" },
+});
+(__VLS_ctx.currentConversationHint);
 if (__VLS_ctx.authStore.user) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({
         ...{ class: "muted" },
@@ -610,8 +660,13 @@ if (!__VLS_ctx.cryptoReady && !__VLS_ctx.errorMessage) {
 }
 if (!__VLS_ctx.conversationType) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "empty-state" },
+        ...{ class: "empty-state chat-empty-state" },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "empty-illustration" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 }
 else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -648,11 +703,17 @@ else {
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "composer" },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "composer-meta" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+(__VLS_ctx.cryptoReady ? '已开启' : '不可用');
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     ...{ onKeyup: (__VLS_ctx.sendMessage) },
     ...{ class: "apple-input" },
     disabled: (!__VLS_ctx.conversationType || __VLS_ctx.sending || !__VLS_ctx.cryptoReady),
-    placeholder: (__VLS_ctx.cryptoReady ? '输入消息' : '当前环境不支持发送加密消息'),
+    placeholder: (__VLS_ctx.cryptoReady ? '输入消息，按回车发送' : '当前环境不支持发送加密消息'),
 });
 (__VLS_ctx.draft);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
@@ -732,6 +793,10 @@ var __VLS_13;
 /** @type {__VLS_StyleScopedClasses['chat-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar']} */ ;
+/** @type {__VLS_StyleScopedClasses['sidebar-banner']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['sidebar-banner-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['signal-pill']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar-top']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['muted']} */ ;
@@ -755,6 +820,7 @@ var __VLS_13;
 /** @type {__VLS_StyleScopedClasses['chat-top-main']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
 /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
 /** @type {__VLS_StyleScopedClasses['refresh-btn']} */ ;
@@ -766,11 +832,14 @@ var __VLS_13;
 /** @type {__VLS_StyleScopedClasses['status-text']} */ ;
 /** @type {__VLS_StyleScopedClasses['error']} */ ;
 /** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['chat-empty-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['empty-illustration']} */ ;
 /** @type {__VLS_StyleScopedClasses['messages']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['composer']} */ ;
+/** @type {__VLS_StyleScopedClasses['composer-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
 var __VLS_dollars;
@@ -800,6 +869,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             showCreateGroup: showCreateGroup,
             showGroupInfo: showGroupInfo,
             currentFriend: currentFriend,
+            totalConversationCount: totalConversationCount,
+            currentConversationHint: currentConversationHint,
             conversationTitle: conversationTitle,
             groupMemberDisplayName: groupMemberDisplayName,
             loadFriends: loadFriends,

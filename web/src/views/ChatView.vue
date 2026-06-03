@@ -124,6 +124,12 @@ const showGroupInfo = ref(false)
 let socket: WebSocket | null = null
 
 const currentFriend = computed(() => friends.value.find((item) => item.friendId === currentFriendId.value) || null)
+const totalConversationCount = computed(() => friends.value.length + groups.value.length)
+const currentConversationHint = computed(() => {
+  if (conversationType.value === 'friend') return currentFriend.value?.signature || '单聊会话已开启'
+  if (conversationType.value === 'group') return currentGroupDetail.value ? `${currentGroupDetail.value.members.length} 位成员参与会话` : '群组会话已开启'
+  return '选择联系人后可开始发送实时消息'
+})
 
 // 当前在聊会话(群或好友)的展示标题
 const conversationTitle = computed(() => {
@@ -534,12 +540,22 @@ onBeforeUnmount(() => {
       :class="{ 'mobile-show-chat': conversationType !== null }"
     >
       <aside class="sidebar">
+        <div class="sidebar-banner">
+          <div>
+            <p class="apple-label">IM Dashboard</p>
+            <h2>消息中心</h2>
+            <p class="sidebar-banner-copy">好友、群组和消息会话都集中在这里。</p>
+          </div>
+          <span class="signal-pill" :class="{ online: socketConnected }">
+            {{ socketConnected ? '消息通道已连接' : '消息通道连接中' }}
+          </span>
+        </div>
         <div class="sidebar-top">
           <div>
             <p class="apple-label">Conversations</p>
-            <h2>会话</h2>
+            <h3>全部会话</h3>
           </div>
-          <small class="muted">{{ socketConnected ? '在线同步中' : '等待连接' }}</small>
+          <small class="muted">{{ totalConversationCount }} 个会话</small>
         </div>
         <div class="sidebar-tabs">
           <button
@@ -594,8 +610,9 @@ onBeforeUnmount(() => {
         <div class="chat-top">
           <button class="back-btn" type="button" @click="backToList" aria-label="返回会话列表">‹</button>
           <div class="chat-top-main">
-            <p class="apple-label">{{ conversationType === 'group' ? 'Group' : 'Conversation' }}</p>
+            <p class="apple-label">{{ conversationType === 'group' ? 'Group Chat' : 'Direct Message' }}</p>
             <h2>{{ conversationTitle }}</h2>
+            <small class="muted">{{ currentConversationHint }}</small>
             <small class="muted" v-if="authStore.user">当前身份：{{ authStore.user.nickname || authStore.user.username }}</small>
           </div>
           <button v-if="conversationType === 'group'" class="apple-button secondary refresh-btn" @click="showGroupInfo = true">群信息</button>
@@ -605,7 +622,11 @@ onBeforeUnmount(() => {
         <p v-if="!cryptoReady && !errorMessage" class="status-text error">
           当前环境不支持端到端加密，仅可查看已有会话。
         </p>
-        <div v-if="!conversationType" class="empty-state">请选择一个好友或群聊开始聊天</div>
+        <div v-if="!conversationType" class="empty-state chat-empty-state">
+          <div class="empty-illustration">💬</div>
+          <strong>这里是 IM 实时会话区</strong>
+          <span>从左侧选择好友或群聊，立即开始收发消息。</span>
+        </div>
         <div v-else ref="messageListRef" class="messages">
           <div
             v-for="(message, index) in messages"
@@ -631,11 +652,15 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="composer">
+          <div class="composer-meta">
+            <span>加密通道</span>
+            <strong>{{ cryptoReady ? '已开启' : '不可用' }}</strong>
+          </div>
           <input
             v-model="draft"
             class="apple-input"
             :disabled="!conversationType || sending || !cryptoReady"
-            :placeholder="cryptoReady ? '输入消息' : '当前环境不支持发送加密消息'"
+            :placeholder="cryptoReady ? '输入消息，按回车发送' : '当前环境不支持发送加密消息'"
             @keyup.enter="sendMessage"
           />
           <button
@@ -702,6 +727,46 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.52);
 }
 
+.sidebar-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(41, 151, 255, 0.16), rgba(52, 211, 153, 0.16));
+  box-shadow: inset 0 0 0 1px rgba(41, 151, 255, 0.12);
+}
+
+.sidebar-banner h2 {
+  margin: 6px 0 6px;
+  font-size: 30px;
+  letter-spacing: -0.03em;
+}
+
+.sidebar-banner-copy {
+  margin: 0;
+  color: #425466;
+  font-size: 14px;
+}
+
+.signal-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  color: #5f6368;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.signal-pill.online {
+  color: #0f9d58;
+}
+
 .sidebar-top,
 .chat-top {
   display: flex;
@@ -710,11 +775,83 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 
-.sidebar-top h2,
+.sidebar-top h3,
 .chat-top h2 {
   margin: 6px 0 0;
   font-size: 28px;
   letter-spacing: -0.03em;
+}
+
+.sidebar-top h3 {
+  font-size: 22px;
+}
+
+.chat-top-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-top-main h2,
+.chat-top-main small {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.chat-top-main h2 {
+  margin-top: 0;
+  line-height: 1.1;
+}
+
+.chat-top-main small {
+  display: block;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.chat-top-main small:first-of-type {
+  color: #425466;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.chat-top-main small:last-of-type {
+  color: #6e6e73;
+  font-size: 12px;
+}
+
+.chat-empty-state {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 248, 255, 0.92));
+  text-align: center;
+}
+
+.empty-illustration {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(41, 151, 255, 0.12);
+  font-size: 34px;
+}
+
+.chat-empty-state strong {
+  font-size: 20px;
+}
+
+.chat-empty-state span {
+  color: #6e6e73;
 }
 
 .friend-item {
@@ -854,8 +991,43 @@ onBeforeUnmount(() => {
 
 .composer {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
   gap: 12px;
+  align-items: center;
+}
+
+.composer-meta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 92px;
+  min-height: 56px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: rgba(245, 245, 247, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.05);
+  text-align: left;
+}
+
+.composer-meta span {
+  color: #6e6e73;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.composer-meta strong {
+  margin-top: 2px;
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.composer .apple-input {
+  min-width: 0;
+}
+
+.composer .apple-button {
+  white-space: nowrap;
 }
 
 /* 桌面端默认隐藏移动端独有的返回按钮 */
@@ -901,10 +1073,18 @@ onBeforeUnmount(() => {
     display: flex;
   }
 
-  .sidebar-top h2,
+  .sidebar-top h3,
   .chat-top h2 {
     font-size: 22px;
     margin-top: 2px;
+  }
+
+  .sidebar-banner {
+    padding: 14px;
+  }
+
+  .sidebar-banner h2 {
+    font-size: 24px;
   }
 
   .chat-top {
@@ -931,6 +1111,10 @@ onBeforeUnmount(() => {
   .chat-top-main {
     flex: 1;
     min-width: 0;
+  }
+
+  .chat-empty-state {
+    min-height: 260px;
   }
 
   .refresh-btn {
@@ -968,6 +1152,11 @@ onBeforeUnmount(() => {
     padding-left: 14px;
     padding-right: 14px;
     padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .composer-meta {
+    grid-column: 1 / -1;
+    min-width: 0;
   }
 
   .composer .apple-input {

@@ -56,11 +56,17 @@ async function login() {
   <div class="page-shell auth-page">
     <div class="auth-hero">
       <div class="hero-copy">
-        <p class="apple-label">Easy Chat</p>
-        <h1 class="apple-title">简单、克制、专注的即时沟通体验。</h1>
+        <p class="apple-label">Easy Chat IM</p>
+        <h1 class="apple-title">打开界面就能看懂的即时通讯系统。</h1>
         <p class="apple-subtitle">
-          面向课程项目的 Web 端 IM，提供账号、好友、聊天与资料管理能力。
+          支持实时消息会话、好友通讯录、群组消息、端到端加密与朋友圈动态，整体界面按 IM 消息中心风格重构。
         </p>
+        <div class="hero-highlights">
+          <span>实时消息</span>
+          <span>好友/群聊</span>
+          <span>消息连接</span>
+          <span>端到端加密</span>
+        </div>
       </div>
       <div class="card auth-card">
         <div class="auth-card-head">
@@ -101,6 +107,22 @@ async function login() {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.hero-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-highlights span {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.06);
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .auth-card {

@@ -60,10 +60,16 @@ async function register() {
     <div class="auth-hero">
       <div class="hero-copy">
         <p class="apple-label">Create account</p>
-        <h1 class="apple-title">创建你的 Easy Chat 账号。</h1>
+        <h1 class="apple-title">注册后立即进入 IM 通讯空间。</h1>
         <p class="apple-subtitle">
-          完成注册后，即可体验好友申请、实时聊天与资料管理功能。
+          完成注册后即可使用消息会话、好友通讯录、群组沟通与个人主页等即时通讯功能。
         </p>
+        <div class="hero-highlights">
+          <span>消息收发</span>
+          <span>好友添加</span>
+          <span>群组沟通</span>
+          <span>个人名片</span>
+        </div>
       </div>
       <div class="card auth-card">
         <div class="auth-card-head">
@@ -106,6 +112,22 @@ async function register() {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.hero-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-highlights span {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.06);
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .auth-card {

@@ -14,12 +14,16 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['brand-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-wrap']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['brand']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-links']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-user-name']} */ ;
@@ -37,9 +41,13 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "brand" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "brand-dot" },
+    ...{ class: "brand-badge" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "brand-copy" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "nav-links" },
 });
@@ -91,6 +99,9 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "nav-user" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "nav-user-status" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
     ...{ class: "nav-user-name" },
 });
 (__VLS_ctx.displayName);
@@ -102,9 +113,11 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
 /** @type {__VLS_StyleScopedClasses['nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
 /** @type {__VLS_StyleScopedClasses['brand']} */ ;
-/** @type {__VLS_StyleScopedClasses['brand-dot']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-links']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-user']} */ ;
+/** @type {__VLS_StyleScopedClasses['nav-user-status']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-user-name']} */ ;
 /** @type {__VLS_StyleScopedClasses['logout-btn']} */ ;
 var __VLS_dollars;

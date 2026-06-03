@@ -53,6 +53,7 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['hero-highlights']} */ ;
 /** @type {__VLS_StyleScopedClasses['auth-card-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['switch-text']} */ ;
 /** @type {__VLS_StyleScopedClasses['auth-hero']} */ ;
@@ -77,6 +78,13 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.h1, __VLS_intrinsicElements.h1
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
     ...{ class: "apple-subtitle" },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "hero-highlights" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "card auth-card" },
 });
@@ -142,6 +150,7 @@ var __VLS_3;
 /** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-subtitle']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-highlights']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
 /** @type {__VLS_StyleScopedClasses['auth-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['auth-card-head']} */ ;
