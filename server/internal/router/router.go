@@ -54,8 +54,9 @@ func New(cfg *config.Config) *gin.Engine {
 	if err != nil {
 		log.Fatal(err)
 	}
+	momentAIProvider := service.NewDeepSeekMomentAIAssistProvider(cfg.AI)
 
-	return newEngine(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo, momentRepo, storage)
+	return newEngine(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo, momentRepo, storage, momentAIProvider)
 }
 
 func NewWithUserRepository(userRepo repository.UserRepository) *gin.Engine {
@@ -63,7 +64,7 @@ func NewWithUserRepository(userRepo repository.UserRepository) *gin.Engine {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return newEngine(userRepo, nil, nil, nil, nil, nil, storage)
+	return newEngine(userRepo, nil, nil, nil, nil, nil, storage, nil)
 }
 
 func NewWithRepositories(
@@ -78,7 +79,7 @@ func NewWithRepositories(
 	if err != nil {
 		log.Fatal(err)
 	}
-	return newEngine(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo, momentRepo, storage)
+	return newEngine(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo, momentRepo, storage, nil)
 }
 
 func newEngine(
@@ -89,6 +90,7 @@ func newEngine(
 	groupMessageRepo repository.GroupMessageRepository,
 	momentRepo repository.MomentRepository,
 	storage service.ObjectStorage,
+	momentAIProvider service.MomentAIAssistProvider,
 ) *gin.Engine {
 	r := gin.Default()
 	r.Use(middleware.CORS())
@@ -172,9 +174,12 @@ func newEngine(
 
 		if momentRepo != nil {
 			momentService := service.NewMomentService(momentRepo, friendRepo, userRepo, storage)
+			momentService.SetAIAssistProvider(momentAIProvider)
 			momentHandler := handler.NewMomentHandler(momentService)
 			// POST /api/moments: 发布一条朋友圈动态，可附带图片 objectKey 列表。
 			authed.POST("/moments", momentHandler.Create)
+			// POST /api/moments/ai-assist: 为朋友圈发布页生成或润色文案建议。
+			authed.POST("/moments/ai-assist", momentHandler.AIAssist)
 			// GET /api/moments: 获取当前用户可见的朋友圈动态列表。
 			authed.GET("/moments", momentHandler.List)
 			// GET /api/users/:id/moments: 获取当前登录用户可见的指定用户朋友圈列表。

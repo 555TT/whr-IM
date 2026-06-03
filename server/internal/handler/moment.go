@@ -26,6 +26,14 @@ type createMomentCommentRequest struct {
 	Content string `json:"content"`
 }
 
+type momentAIAssistRequest struct {
+	Mode     string `json:"mode"`
+	Prompt   string `json:"prompt"`
+	Content  string `json:"content"`
+	Tone     string `json:"tone"`
+	HasImage bool   `json:"hasImage"`
+}
+
 func (h *MomentHandler) Create(c *gin.Context) {
 	var req createMomentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -41,6 +49,37 @@ func (h *MomentHandler) Create(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, moment)
+}
+
+func (h *MomentHandler) AIAssist(c *gin.Context) {
+	var req momentAIAssistRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid request"})
+		return
+	}
+	text, err := h.momentService.AIAssist(service.MomentAIAssistInput{
+		Mode:     req.Mode,
+		Prompt:   req.Prompt,
+		Content:  req.Content,
+		Tone:     req.Tone,
+		HasImage: req.HasImage,
+	})
+	if err != nil {
+		switch {
+		case err == service.ErrMomentAIAssistPromptRequired:
+			c.JSON(http.StatusBadRequest, gin.H{"message": "请输入想法后再生成文案"})
+		case err == service.ErrMomentAIAssistContentRequired:
+			c.JSON(http.StatusBadRequest, gin.H{"message": "请先输入正文后再进行润色"})
+		case err == service.ErrMomentAIAssistInvalidMode:
+			c.JSON(http.StatusBadRequest, gin.H{"message": "AI 助手模式无效"})
+		case err == service.ErrMomentAIAssistUnavailable:
+			c.JSON(http.StatusServiceUnavailable, gin.H{"message": "AI 助手暂未配置，请稍后再试"})
+		default:
+			c.JSON(http.StatusBadGateway, gin.H{"message": "AI 生成暂时失败，请稍后重试"})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"text": text})
 }
 
 func (h *MomentHandler) List(c *gin.Context) {

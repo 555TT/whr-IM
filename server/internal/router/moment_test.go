@@ -8,6 +8,133 @@ import (
 	"testing"
 )
 
+func TestMomentsAIAssistGenerateSuccess(t *testing.T) {
+	r := newTestRouter(t)
+	aliceToken := registerAndLogin(t, r, "alice")
+
+	body := []byte(`{"mode":"generate","prompt":"写一条周末露营朋友圈","tone":"自然","hasImage":true}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/moments/ai-assist", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+aliceToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected ai assist generate status 200, got %d with body %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("expected valid ai assist generate json, got error: %v", err)
+	}
+	if resp.Text == "" {
+		t.Fatal("expected generated text")
+	}
+}
+
+func TestMomentsAIAssistPolishSuccess(t *testing.T) {
+	r := newTestRouter(t)
+	aliceToken := registerAndLogin(t, r, "alice")
+
+	body := []byte(`{"mode":"polish","content":"今天和朋友吃饭很开心","tone":"文艺","hasImage":false}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/moments/ai-assist", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+aliceToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected ai assist polish status 200, got %d with body %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("expected valid ai assist polish json, got error: %v", err)
+	}
+	if resp.Text == "" {
+		t.Fatal("expected polished text")
+	}
+}
+
+func TestMomentsAIAssistRejectsInvalidRequest(t *testing.T) {
+	r := newTestRouter(t)
+	aliceToken := registerAndLogin(t, r, "alice")
+
+	body := []byte(`{"mode":"generate","prompt":"","tone":"自然","hasImage":false}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/moments/ai-assist", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+aliceToken)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected ai assist invalid status 400, got %d with body %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMomentsAIAssistRequiresAuthentication(t *testing.T) {
+	r := newTestRouter(t)
+
+	body := []byte(`{"mode":"generate","prompt":"写一条周末露营朋友圈","tone":"自然","hasImage":true}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/moments/ai-assist", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected ai assist unauth status 401, got %d with body %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateMomentRejectsWhitespaceOnlyContent(t *testing.T) {
+	r := newTestRouter(t)
+	aliceToken := registerAndLogin(t, r, "alice")
+
+	createBody := []byte(`{"content":"   ","imageKeys":[]}`)
+	createReq := httptest.NewRequest(http.MethodPost, "/api/moments", bytes.NewReader(createBody))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	createW := httptest.NewRecorder()
+
+	r.ServeHTTP(createW, createReq)
+
+	if createW.Code != http.StatusBadRequest {
+		t.Fatalf("expected whitespace-only create moment status 400, got %d with body %s", createW.Code, createW.Body.String())
+	}
+}
+
+func TestCreateCommentRejectsWhitespaceOnlyContent(t *testing.T) {
+	r := newTestRouter(t)
+	aliceToken := registerAndLogin(t, r, "alice")
+	bobToken := registerAndLogin(t, r, "bobby")
+	makeFriends(t, r, aliceToken, bobToken)
+
+	createBody := []byte(`{"content":"第一条朋友圈","imageKeys":[]}`)
+	createReq := httptest.NewRequest(http.MethodPost, "/api/moments", bytes.NewReader(createBody))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("expected create moment status 201, got %d with body %s", createW.Code, createW.Body.String())
+	}
+
+	commentBody := []byte(`{"content":"   "}`)
+	commentReq := httptest.NewRequest(http.MethodPost, "/api/moments/1/comments", bytes.NewReader(commentBody))
+	commentReq.Header.Set("Content-Type", "application/json")
+	commentReq.Header.Set("Authorization", "Bearer "+bobToken)
+	commentW := httptest.NewRecorder()
+	r.ServeHTTP(commentW, commentReq)
+
+	if commentW.Code != http.StatusBadRequest {
+		t.Fatalf("expected whitespace-only comment status 400, got %d with body %s", commentW.Code, commentW.Body.String())
+	}
+}
+
 func TestUserCanCreateAndListFriendVisibleMoments(t *testing.T) {
 	r := newTestRouter(t)
 

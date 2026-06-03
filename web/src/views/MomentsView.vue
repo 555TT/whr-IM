@@ -33,6 +33,12 @@ interface UploadResponse {
   url: string
 }
 
+interface MomentAIAssistResponse {
+  text: string
+}
+
+type MomentAIAssistMode = 'generate' | 'polish'
+
 const authStore = useAuthStore()
 const router = useRouter()
 const skin = computed(() => resolveHomepageSkin(authStore.user?.homepageSkin))
@@ -45,10 +51,19 @@ const errorMessage = ref('')
 const loading = ref(false)
 const uploadingImage = ref(false)
 const commentDrafts = ref<Record<number, string>>({})
+const aiMode = ref<MomentAIAssistMode>('generate')
+const aiTone = ref('自然')
+const aiPrompt = ref('')
+const aiLoading = ref(false)
+const aiResult = ref('')
 
 async function loadMoments() {
-  const { data } = await http.get('/moments')
-  moments.value = data
+  try {
+    const { data } = await http.get('/moments')
+    moments.value = data
+  } catch (error) {
+    errorMessage.value = (error as Error).message
+  }
 }
 
 async function uploadImage(event: Event) {
@@ -74,6 +89,48 @@ async function uploadImage(event: Event) {
   }
 }
 
+async function requestAIAssist() {
+  const prompt = aiPrompt.value.trim()
+  const currentContent = content.value.trim()
+  if (aiMode.value === 'generate' && !prompt) {
+    errorMessage.value = '请输入想法后再生成文案'
+    feedback.value = ''
+    return
+  }
+  if (aiMode.value === 'polish' && !currentContent) {
+    errorMessage.value = '请先输入正文后再进行润色'
+    feedback.value = ''
+    return
+  }
+
+  const payload = {
+    mode: aiMode.value,
+    prompt: aiMode.value === 'generate' ? prompt : '',
+    content: aiMode.value === 'polish' ? currentContent : '',
+    tone: aiTone.value,
+    hasImage: Boolean(uploadedImageKey.value)
+  }
+  aiLoading.value = true
+  aiResult.value = ''
+  feedback.value = ''
+  errorMessage.value = ''
+  try {
+    const { data } = await http.post<MomentAIAssistResponse>('/moments/ai-assist', payload)
+    aiResult.value = data.text
+    feedback.value = 'AI 文案已生成'
+  } catch (error) {
+    errorMessage.value = (error as Error).message
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+function applyAIResult() {
+  if (!aiResult.value) return
+  content.value = aiResult.value
+  feedback.value = '已填入正文'
+}
+
 async function publishMoment() {
   if (!content.value.trim()) return
   feedback.value = ''
@@ -87,6 +144,8 @@ async function publishMoment() {
     content.value = ''
     uploadedImageKey.value = ''
     uploadedImageUrl.value = ''
+    aiPrompt.value = ''
+    aiResult.value = ''
     feedback.value = '动态已发布'
     await loadMoments()
   } catch (error) {
@@ -155,6 +214,41 @@ onMounted(loadMoments)
         <p v-if="feedback" class="status-text success">{{ feedback }}</p>
         <p v-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
         <textarea v-model="content" class="apple-textarea" placeholder="分享这一刻..." />
+        <div class="ai-assistant card apple-panel" :class="skin.accentClass">
+          <div class="ai-head">
+            <div>
+              <p class="apple-label">AI Moments</p>
+              <strong>朋友圈助手</strong>
+            </div>
+            <span class="muted">只生成建议，不会自动发布</span>
+          </div>
+          <div class="ai-mode-row">
+            <button class="apple-button secondary" type="button" :class="{ active: aiMode === 'generate' }" @click="aiMode = 'generate'">智能配文</button>
+            <button class="apple-button secondary" type="button" :class="{ active: aiMode === 'polish' }" @click="aiMode = 'polish'">文案润色</button>
+          </div>
+          <label v-if="aiMode === 'generate'" class="ai-field">
+            <span class="apple-label">这一刻想表达什么</span>
+            <input v-model="aiPrompt" class="apple-input" placeholder="比如：周末和朋友露营，看日落很治愈" />
+          </label>
+          <p v-else class="muted ai-hint">将基于当前正文内容进行润色。</p>
+          <label class="ai-field">
+            <span class="apple-label">语气风格</span>
+            <select v-model="aiTone" class="apple-input">
+              <option value="自然">自然</option>
+              <option value="幽默">幽默</option>
+              <option value="文艺">文艺</option>
+              <option value="简洁">简洁</option>
+            </select>
+          </label>
+          <div class="ai-actions">
+            <button class="apple-button secondary" type="button" :disabled="aiLoading" @click="requestAIAssist">{{ aiLoading ? '生成中...' : aiMode === 'polish' ? '开始润色' : '生成文案' }}</button>
+            <button class="apple-button" type="button" :disabled="!aiResult" @click="applyAIResult">填入正文</button>
+          </div>
+          <div v-if="aiResult" class="ai-result">
+            <p class="apple-label">AI 建议</p>
+            <p>{{ aiResult }}</p>
+          </div>
+        </div>
         <div class="upload-field">
           <span class="apple-label">配图（可选）</span>
           <label class="upload-picker" :class="{ uploading: uploadingImage }">
@@ -264,6 +358,66 @@ onMounted(loadMoments)
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.ai-assistant {
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1d1d1f;
+  border: 1px solid var(--skin-accent-soft, rgba(0, 113, 227, 0.16));
+}
+
+.ai-assistant .apple-label {
+  color: #6e6e73;
+}
+
+.ai-assistant .muted,
+.ai-assistant strong,
+.ai-assistant span,
+.ai-assistant p,
+.ai-assistant label {
+  color: #1d1d1f;
+}
+
+.ai-head,
+.ai-actions,
+.ai-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ai-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-hint {
+  margin: 0;
+}
+
+.ai-result {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--skin-accent-soft, rgba(0, 113, 227, 0.08));
+}
+
+.ai-result p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.ai-mode-row .apple-button.active {
+  border-color: transparent;
+  background: var(--skin-accent, #0071e3);
+  color: #fff;
+}
+
+.ai-actions .apple-button[disabled] {
+  opacity: 0.6;
 }
 
 .upload-picker {

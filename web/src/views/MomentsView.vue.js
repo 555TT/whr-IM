@@ -16,9 +16,19 @@ const errorMessage = ref('');
 const loading = ref(false);
 const uploadingImage = ref(false);
 const commentDrafts = ref({});
+const aiMode = ref('generate');
+const aiTone = ref('自然');
+const aiPrompt = ref('');
+const aiLoading = ref(false);
+const aiResult = ref('');
 async function loadMoments() {
-    const { data } = await http.get('/moments');
-    moments.value = data;
+    try {
+        const { data } = await http.get('/moments');
+        moments.value = data;
+    }
+    catch (error) {
+        errorMessage.value = error.message;
+    }
 }
 async function uploadImage(event) {
     const input = event.target;
@@ -44,6 +54,48 @@ async function uploadImage(event) {
         input.value = '';
     }
 }
+async function requestAIAssist() {
+    const prompt = aiPrompt.value.trim();
+    const currentContent = content.value.trim();
+    if (aiMode.value === 'generate' && !prompt) {
+        errorMessage.value = '请输入想法后再生成文案';
+        feedback.value = '';
+        return;
+    }
+    if (aiMode.value === 'polish' && !currentContent) {
+        errorMessage.value = '请先输入正文后再进行润色';
+        feedback.value = '';
+        return;
+    }
+    const payload = {
+        mode: aiMode.value,
+        prompt: aiMode.value === 'generate' ? prompt : '',
+        content: aiMode.value === 'polish' ? currentContent : '',
+        tone: aiTone.value,
+        hasImage: Boolean(uploadedImageKey.value)
+    };
+    aiLoading.value = true;
+    aiResult.value = '';
+    feedback.value = '';
+    errorMessage.value = '';
+    try {
+        const { data } = await http.post('/moments/ai-assist', payload);
+        aiResult.value = data.text;
+        feedback.value = 'AI 文案已生成';
+    }
+    catch (error) {
+        errorMessage.value = error.message;
+    }
+    finally {
+        aiLoading.value = false;
+    }
+}
+function applyAIResult() {
+    if (!aiResult.value)
+        return;
+    content.value = aiResult.value;
+    feedback.value = '已填入正文';
+}
 async function publishMoment() {
     if (!content.value.trim())
         return;
@@ -58,6 +110,8 @@ async function publishMoment() {
         content.value = '';
         uploadedImageKey.value = '';
         uploadedImageUrl.value = '';
+        aiPrompt.value = '';
+        aiResult.value = '';
         feedback.value = '动态已发布';
         await loadMoments();
     }
@@ -124,6 +178,18 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['composer-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['moment-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['composer-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-assistant']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-assistant']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-assistant']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-assistant']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-assistant']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-assistant']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-result']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-mode-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
 /** @type {__VLS_StyleScopedClasses['upload-picker']} */ ;
 /** @type {__VLS_StyleScopedClasses['upload-picker']} */ ;
 /** @type {__VLS_StyleScopedClasses['clickable-name']} */ ;
@@ -168,6 +234,106 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.textarea)({
     ...{ class: "apple-textarea" },
     placeholder: "分享这一刻...",
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "ai-assistant card apple-panel" },
+    ...{ class: (__VLS_ctx.skin.accentClass) },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "ai-head" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "apple-label" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "muted" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "ai-mode-row" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.aiMode = 'generate';
+        } },
+    ...{ class: "apple-button secondary" },
+    type: "button",
+    ...{ class: ({ active: __VLS_ctx.aiMode === 'generate' }) },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.aiMode = 'polish';
+        } },
+    ...{ class: "apple-button secondary" },
+    type: "button",
+    ...{ class: ({ active: __VLS_ctx.aiMode === 'polish' }) },
+});
+if (__VLS_ctx.aiMode === 'generate') {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+        ...{ class: "ai-field" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "apple-label" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        ...{ class: "apple-input" },
+        placeholder: "比如：周末和朋友露营，看日落很治愈",
+    });
+    (__VLS_ctx.aiPrompt);
+}
+else {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "muted ai-hint" },
+    });
+}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+    ...{ class: "ai-field" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "apple-label" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
+    value: (__VLS_ctx.aiTone),
+    ...{ class: "apple-input" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+    value: "自然",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+    value: "幽默",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+    value: "文艺",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+    value: "简洁",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "ai-actions" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.requestAIAssist) },
+    ...{ class: "apple-button secondary" },
+    type: "button",
+    disabled: (__VLS_ctx.aiLoading),
+});
+(__VLS_ctx.aiLoading ? '生成中...' : __VLS_ctx.aiMode === 'polish' ? '开始润色' : '生成文案');
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.applyAIResult) },
+    ...{ class: "apple-button" },
+    type: "button",
+    disabled: (!__VLS_ctx.aiResult),
+});
+if (__VLS_ctx.aiResult) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "ai-result" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "apple-label" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
+    (__VLS_ctx.aiResult);
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "upload-field" },
 });
@@ -354,6 +520,31 @@ for (const [item] of __VLS_getVForSourceType((__VLS_ctx.moments))) {
 /** @type {__VLS_StyleScopedClasses['status-text']} */ ;
 /** @type {__VLS_StyleScopedClasses['error']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-textarea']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-assistant']} */ ;
+/** @type {__VLS_StyleScopedClasses['card']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-mode-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-hint']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-result']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['upload-field']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['upload-picker']} */ ;
@@ -412,7 +603,14 @@ const __VLS_self = (await import('vue')).defineComponent({
             loading: loading,
             uploadingImage: uploadingImage,
             commentDrafts: commentDrafts,
+            aiMode: aiMode,
+            aiTone: aiTone,
+            aiPrompt: aiPrompt,
+            aiLoading: aiLoading,
+            aiResult: aiResult,
             uploadImage: uploadImage,
+            requestAIAssist: requestAIAssist,
+            applyAIResult: applyAIResult,
             publishMoment: publishMoment,
             toggleLike: toggleLike,
             submitComment: submitComment,

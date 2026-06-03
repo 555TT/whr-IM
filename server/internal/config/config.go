@@ -11,6 +11,7 @@ type Config struct {
 	Server        ServerConfig        `yaml:"server"`
 	MySQL         MySQLConfig         `yaml:"mysql"`
 	ObjectStorage ObjectStorageConfig `yaml:"objectStorage"`
+	AI            AIConfig            `yaml:"ai"`
 }
 
 type ServerConfig struct {
@@ -28,6 +29,12 @@ type ObjectStorageConfig struct {
 	Bucket        string `yaml:"bucket"`
 	UseSSL        bool   `yaml:"useSSL"`
 	PublicBaseURL string `yaml:"publicBaseUrl"`
+}
+
+type AIConfig struct {
+	DeepSeekBaseURL string `yaml:"deepseekBaseUrl"`
+	DeepSeekAPIKey  string `yaml:"deepseekApiKey"`
+	DeepSeekModel   string `yaml:"deepseekModel"`
 }
 
 func Load(path string) (*Config, error) {
@@ -67,5 +74,14 @@ func applyEnvOverrides(cfg *Config) {
 		if parsed, err := strconv.ParseBool(value); err == nil {
 			cfg.ObjectStorage.UseSSL = parsed
 		}
+	}
+	if value := os.Getenv("DEEPSEEK_BASE_URL"); value != "" {
+		cfg.AI.DeepSeekBaseURL = value
+	}
+	if value := os.Getenv("DEEPSEEK_API_KEY"); value != "" {
+		cfg.AI.DeepSeekAPIKey = value
+	}
+	if value := os.Getenv("DEEPSEEK_MODEL"); value != "" {
+		cfg.AI.DeepSeekModel = value
 	}
 }

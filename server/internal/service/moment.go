@@ -3,21 +3,36 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 
 	"whr-im/server/internal/model"
 	"whr-im/server/internal/repository"
 )
+
+type MomentAIAssistProvider interface {
+	Generate(input MomentAIAssistInput) (string, error)
+	Polish(input MomentAIAssistInput) (string, error)
+}
 
 type MomentService struct {
 	momentRepo repository.MomentRepository
 	friendRepo repository.FriendRepository
 	userRepo   repository.UserRepository
 	storage    ObjectStorage
+	aiProvider MomentAIAssistProvider
 }
 
 func NewMomentService(momentRepo repository.MomentRepository, friendRepo repository.FriendRepository, userRepo repository.UserRepository, storage ObjectStorage) *MomentService {
-	return &MomentService{momentRepo: momentRepo, friendRepo: friendRepo, userRepo: userRepo, storage: storage}
+	return &MomentService{momentRepo: momentRepo, friendRepo: friendRepo, userRepo: userRepo, storage: storage, aiProvider: stubMomentAIAssistProvider{}}
+}
+
+func (s *MomentService) SetAIAssistProvider(provider MomentAIAssistProvider) {
+	if provider == nil {
+		return
+	}
+	s.aiProvider = provider
 }
 
 type CreateMomentInput struct {
@@ -29,6 +44,14 @@ type CreateMomentCommentInput struct {
 	Content string
 }
 
+type MomentAIAssistInput struct {
+	Mode     string
+	Prompt   string
+	Content  string
+	Tone     string
+	HasImage bool
+}
+
 type MomentCommentView struct {
 	ID        uint64 `json:"id"`
 	UserID    uint64 `json:"userId"`
@@ -38,6 +61,11 @@ type MomentCommentView struct {
 }
 
 var ErrMomentNotVisible = fmt.Errorf("moment is not visible to current user")
+var ErrMomentAIAssistPromptRequired = errors.New("prompt is required")
+var ErrMomentAIAssistContentRequired = errors.New("content is required")
+var ErrMomentAIAssistInvalidMode = errors.New("mode must be generate or polish")
+var ErrMomentAIAssistUnavailable = errors.New("moment ai assist is unavailable")
+var ErrMomentAIAssistUpstream = errors.New("moment ai assist upstream failed")
 
 type MomentView struct {
 	ID        uint64              `json:"id"`
@@ -53,6 +81,7 @@ type MomentView struct {
 }
 
 func (s *MomentService) Create(userID uint64, input CreateMomentInput) (*MomentView, error) {
+	input.Content = strings.TrimSpace(input.Content)
 	if input.Content == "" {
 		return nil, fmt.Errorf("content is required")
 	}
@@ -98,6 +127,7 @@ func (s *MomentService) Unlike(userID uint64, momentID uint64) error {
 }
 
 func (s *MomentService) CreateComment(userID uint64, momentID uint64, input CreateMomentCommentInput) error {
+	input.Content = strings.TrimSpace(input.Content)
 	if input.Content == "" {
 		return fmt.Errorf("content is required")
 	}
@@ -125,6 +155,28 @@ func (s *MomentService) Delete(userID uint64, momentID uint64) error {
 		return fmt.Errorf("only the author can delete this moment")
 	}
 	return s.momentRepo.Delete(momentID)
+}
+
+func (s *MomentService) AIAssist(input MomentAIAssistInput) (string, error) {
+	input.Mode = strings.TrimSpace(input.Mode)
+	input.Prompt = strings.TrimSpace(input.Prompt)
+	input.Content = strings.TrimSpace(input.Content)
+	input.Tone = strings.TrimSpace(input.Tone)
+
+	switch input.Mode {
+	case "generate":
+		if input.Prompt == "" {
+			return "", ErrMomentAIAssistPromptRequired
+		}
+		return s.aiProvider.Generate(input)
+	case "polish":
+		if input.Content == "" {
+			return "", ErrMomentAIAssistContentRequired
+		}
+		return s.aiProvider.Polish(input)
+	default:
+		return "", ErrMomentAIAssistInvalidMode
+	}
 }
 
 func (s *MomentService) ListVisible(userID uint64) ([]MomentView, error) {
@@ -192,6 +244,31 @@ func (s *MomentService) canViewMoment(userID uint64, ownerID uint64) bool {
 		}
 	}
 	return false
+}
+
+type stubMomentAIAssistProvider struct{}
+
+func (stubMomentAIAssistProvider) Generate(input MomentAIAssistInput) (string, error) {
+	text := "帮你生成一条"
+	if input.Tone != "" {
+		text += input.Tone + "风格"
+	}
+	text += "朋友圈文案：" + input.Prompt
+	if input.HasImage {
+		text += " 配图已考虑进表达中。"
+	}
+	return text, nil
+}
+
+func (stubMomentAIAssistProvider) Polish(input MomentAIAssistInput) (string, error) {
+	text := "润色后：" + input.Content
+	if input.Tone != "" {
+		text += "（" + input.Tone + "）"
+	}
+	if input.HasImage {
+		text += " 配图语境已补充。"
+	}
+	return text, nil
 }
 
 func (s *MomentService) buildMomentViewForUser(moment *model.Moment, viewerID uint64, nickname string, avatar string) (*MomentView, error) {
