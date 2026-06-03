@@ -143,7 +143,7 @@ onMounted(loadMoments)
       <div class="card apple-panel composer-card">
         <p class="apple-label">Moments</p>
         <h1>朋友圈</h1>
-        <p class="muted">这一小步先升级成：本地选图上传后再发动态。</p>
+        <p class="muted">可选择一张图片后再发布动态。</p>
         <p v-if="feedback" class="status-text success">{{ feedback }}</p>
         <p v-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
         <textarea v-model="content" class="apple-textarea" placeholder="分享这一刻..." />
