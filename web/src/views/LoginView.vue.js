@@ -5,7 +5,7 @@ import { useAuthStore } from '../stores/auth';
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
-const errorMessage = ref('');
+const errorMessage = ref(typeof route.query.message === 'string' ? route.query.message : '');
 const loading = ref(false);
 const form = reactive({
     username: typeof route.query.username === 'string' ? route.query.username : '',
@@ -13,6 +13,9 @@ const form = reactive({
 });
 watch(() => route.query.username, (value) => {
     form.username = typeof value === 'string' ? value : '';
+});
+watch(() => route.query.message, (value) => {
+    errorMessage.value = typeof value === 'string' ? value : '';
 });
 function validate() {
     if (form.username.length < 4 || form.username.length > 20) {

@@ -1,4 +1,5 @@
 import { computed, onMounted, reactive, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import AppNav from '../components/AppNav.vue';
 import AvatarCropper from '../components/AvatarCropper.vue';
 import { http } from '../api/http';
@@ -200,6 +201,19 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.textarea)({
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "profile-actions" },
 });
+const __VLS_3 = {}.RouterLink;
+/** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
+// @ts-ignore
+const __VLS_4 = __VLS_asFunctionalComponent(__VLS_3, new __VLS_3({
+    ...{ class: "apple-button secondary-button" },
+    to: "/security",
+}));
+const __VLS_5 = __VLS_4({
+    ...{ class: "apple-button secondary-button" },
+    to: "/security",
+}, ...__VLS_functionalComponentArgsRest(__VLS_4));
+__VLS_6.slots.default;
+var __VLS_6;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.saveProfile) },
     ...{ class: "apple-button" },
@@ -207,30 +221,30 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
 });
 /** @type {[typeof AvatarCropper, ]} */ ;
 // @ts-ignore
-const __VLS_3 = __VLS_asFunctionalComponent(AvatarCropper, new AvatarCropper({
+const __VLS_7 = __VLS_asFunctionalComponent(AvatarCropper, new AvatarCropper({
     ...{ 'onClose': {} },
     ...{ 'onConfirm': {} },
     visible: (__VLS_ctx.cropperVisible),
     imageUrl: (__VLS_ctx.cropperImageUrl),
 }));
-const __VLS_4 = __VLS_3({
+const __VLS_8 = __VLS_7({
     ...{ 'onClose': {} },
     ...{ 'onConfirm': {} },
     visible: (__VLS_ctx.cropperVisible),
     imageUrl: (__VLS_ctx.cropperImageUrl),
-}, ...__VLS_functionalComponentArgsRest(__VLS_3));
-let __VLS_6;
-let __VLS_7;
-let __VLS_8;
-const __VLS_9 = {
+}, ...__VLS_functionalComponentArgsRest(__VLS_7));
+let __VLS_10;
+let __VLS_11;
+let __VLS_12;
+const __VLS_13 = {
     onClose: (...[$event]) => {
         __VLS_ctx.cropperVisible = false;
     }
 };
-const __VLS_10 = {
+const __VLS_14 = {
     onConfirm: (__VLS_ctx.applyCroppedAvatar)
 };
-var __VLS_5;
+var __VLS_9;
 /** @type {__VLS_StyleScopedClasses['page-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-page']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
@@ -258,10 +272,13 @@ var __VLS_5;
 /** @type {__VLS_StyleScopedClasses['apple-textarea']} */ ;
 /** @type {__VLS_StyleScopedClasses['profile-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['secondary-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
+            RouterLink: RouterLink,
             AppNav: AppNav,
             AvatarCropper: AvatarCropper,
             loading: loading,

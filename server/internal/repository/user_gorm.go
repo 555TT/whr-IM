@@ -83,6 +83,14 @@ func (r *GormUserRepository) UpdatePublicKey(userID uint64, publicKey string, al
 	return r.FindByID(userID)
 }
 
+func (r *GormUserRepository) UpdatePasswordHash(userID uint64, passwordHash string) (*model.User, error) {
+	result := r.db.Model(&model.User{}).Where("id = ?", userID).Update("password_hash", passwordHash)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return r.FindByID(userID)
+}
+
 func isDuplicateKeyError(err error) bool {
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return true

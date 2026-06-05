@@ -48,6 +48,12 @@ type updatePublicKeyRequest struct {
 	Algorithm string `json:"algorithm"`
 }
 
+type changePasswordRequest struct {
+	OldPassword        string `json:"oldPassword"`
+	NewPassword        string `json:"newPassword"`
+	ConfirmNewPassword string `json:"confirmNewPassword"`
+}
+
 func (h *AuthUserHandler) Register(c *gin.Context) {
 	var req registerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -170,4 +176,28 @@ func (h *AuthUserHandler) UpdateMyPublicKey(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+func (h *AuthUserHandler) UpdateMyPassword(c *gin.Context) {
+	var req changePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid request"})
+		return
+	}
+
+	userID := c.MustGet("userID").(uint64)
+	if err := h.authService.ChangePassword(userID, service.ChangePasswordInput{
+		OldPassword:        req.OldPassword,
+		NewPassword:        req.NewPassword,
+		ConfirmNewPassword: req.ConfirmNewPassword,
+	}); err != nil {
+		status := http.StatusNotFound
+		if errors.Is(err, service.ErrInvalidPasswordChange) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "password updated"})
 }

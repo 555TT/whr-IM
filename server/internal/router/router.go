@@ -147,6 +147,8 @@ func newEngine(
 	authed.GET("/users/:id/profile", authHandler.PublicProfile)
 	// PUT /api/users/me: 更新当前登录用户的昵称、性别、个性签名等资料。
 	authed.PUT("/users/me", authHandler.UpdateMe)
+	// PUT /api/users/me/password: 修改当前登录用户密码，成功后前端需重新登录。
+	authed.PUT("/users/me/password", authHandler.UpdateMyPassword)
 	// PUT /api/users/me/public-key: 更新当前登录用户的公钥信息，用于端到端加密通信。
 	authed.PUT("/users/me/public-key", authHandler.UpdateMyPublicKey)
 	// POST /api/uploads/images: 上传图片到对象存储，返回 objectKey 和可访问地址。

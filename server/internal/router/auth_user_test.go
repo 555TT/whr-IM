@@ -331,6 +331,95 @@ func TestUserCannotUpdatePublicKeyWithInvalidPayload(t *testing.T) {
 	})
 }
 
+func TestUserCanChangeOwnPasswordAndMustUseNewPasswordAfterward(t *testing.T) {
+	r := newTestRouter(t)
+	token := registerAndLogin(t, r, "alice")
+
+	changeBody := []byte(`{"oldPassword":"secret123","newPassword":"newsecret456","confirmNewPassword":"newsecret456"}`)
+	changeReq := httptest.NewRequest(http.MethodPut, "/api/users/me/password", bytes.NewReader(changeBody))
+	changeReq.Header.Set("Content-Type", "application/json")
+	changeReq.Header.Set("Authorization", "Bearer "+token)
+	changeW := httptest.NewRecorder()
+
+	r.ServeHTTP(changeW, changeReq)
+
+	if changeW.Code != http.StatusOK {
+		t.Fatalf("expected password update status 200, got %d with body %s", changeW.Code, changeW.Body.String())
+	}
+
+	var changeResp struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(changeW.Body.Bytes(), &changeResp); err != nil {
+		t.Fatalf("expected valid password update response json, got error: %v", err)
+	}
+	if changeResp.Message != "password updated" {
+		t.Fatalf("expected success message password updated, got %q", changeResp.Message)
+	}
+
+	oldLoginBody := []byte(`{"username":"alice","password":"secret123"}`)
+	oldLoginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(oldLoginBody))
+	oldLoginReq.Header.Set("Content-Type", "application/json")
+	oldLoginW := httptest.NewRecorder()
+	r.ServeHTTP(oldLoginW, oldLoginReq)
+
+	if oldLoginW.Code != http.StatusUnauthorized {
+		t.Fatalf("expected old password login status 401, got %d with body %s", oldLoginW.Code, oldLoginW.Body.String())
+	}
+
+	newLoginBody := []byte(`{"username":"alice","password":"newsecret456"}`)
+	newLoginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(newLoginBody))
+	newLoginReq.Header.Set("Content-Type", "application/json")
+	newLoginW := httptest.NewRecorder()
+	r.ServeHTTP(newLoginW, newLoginReq)
+
+	if newLoginW.Code != http.StatusOK {
+		t.Fatalf("expected new password login status 200, got %d with body %s", newLoginW.Code, newLoginW.Body.String())
+	}
+}
+
+func TestUserCannotChangePasswordWithInvalidPayload(t *testing.T) {
+	r := newTestRouter(t)
+	token := registerAndLogin(t, r, "bobby")
+
+	testCases := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "wrong old password",
+			body: `{"oldPassword":"wrong123","newPassword":"newsecret456","confirmNewPassword":"newsecret456"}`,
+		},
+		{
+			name: "mismatched confirm password",
+			body: `{"oldPassword":"secret123","newPassword":"newsecret456","confirmNewPassword":"different456"}`,
+		},
+		{
+			name: "short new password",
+			body: `{"oldPassword":"secret123","newPassword":"12345","confirmNewPassword":"12345"}`,
+		},
+		{
+			name: "same old and new password",
+			body: `{"oldPassword":"secret123","newPassword":"secret123","confirmNewPassword":"secret123"}`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPut, "/api/users/me/password", bytes.NewReader([]byte(tc.body)))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+			w := httptest.NewRecorder()
+
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected password update status 400, got %d with body %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestRegisterRejectsDuplicateUsername(t *testing.T) {
 	r := newTestRouter(t)
 	body := []byte(`{"username":"alice","password":"secret123","confirmPassword":"secret123"}`)

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import AppNav from '../components/AppNav.vue'
 import AvatarCropper from '../components/AvatarCropper.vue'
@@ -145,6 +146,7 @@ onMounted(syncProfile)
         <textarea v-model="profile.signature" class="apple-textarea" placeholder="写一句介绍自己的话" />
       </label>
       <div class="profile-actions">
+        <RouterLink class="apple-button secondary-button" to="/security">账号安全</RouterLink>
         <button class="apple-button" :disabled="loading" @click="saveProfile">保存更改</button>
       </div>
     </section>
@@ -284,6 +286,16 @@ label {
 .profile-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
+}
+
+.secondary-button {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
 }
 
 @media (max-width: 760px) {

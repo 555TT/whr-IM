@@ -17,6 +17,7 @@ const defaultHomepageSkin = "aurora"
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrInvalidPublicKey = errors.New("invalid public key update")
+var ErrInvalidPasswordChange = errors.New("invalid password change")
 var ErrInvalidHomepageSkin = errors.New("invalid homepage skin")
 var ErrProfileNotVisible = errors.New("profile is not visible to current user")
 
@@ -57,6 +58,12 @@ type UpdateProfileInput struct {
 type UpdatePublicKeyInput struct {
 	PublicKey string
 	Algorithm string
+}
+
+type ChangePasswordInput struct {
+	OldPassword        string
+	NewPassword        string
+	ConfirmNewPassword string
 }
 
 type PublicProfile struct {
@@ -204,6 +211,37 @@ func (s *AuthService) UpdatePublicKey(userID uint64, input UpdatePublicKeyInput)
 	}
 
 	return s.repo.UpdatePublicKey(userID, input.PublicKey, input.Algorithm)
+}
+
+func (s *AuthService) ChangePassword(userID uint64, input ChangePasswordInput) error {
+	user, err := s.repo.FindByID(userID)
+	if err != nil {
+		return err
+	}
+
+	if input.OldPassword == "" {
+		return fmt.Errorf("%w: old password is required", ErrInvalidPasswordChange)
+	}
+	if len(input.NewPassword) < minPasswordLength || len(input.NewPassword) > maxPasswordLength {
+		return fmt.Errorf("%w: password length must be between 6 and 20", ErrInvalidPasswordChange)
+	}
+	if input.NewPassword != input.ConfirmNewPassword {
+		return fmt.Errorf("%w: passwords do not match", ErrInvalidPasswordChange)
+	}
+	if input.OldPassword == input.NewPassword {
+		return fmt.Errorf("%w: new password must be different from old password", ErrInvalidPasswordChange)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.OldPassword)); err != nil {
+		return fmt.Errorf("%w: old password is incorrect", ErrInvalidPasswordChange)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.repo.UpdatePasswordHash(userID, string(hash))
+	return err
 }
 
 func validateCredentials(username, password string) error {

@@ -11,6 +11,7 @@ import CreateMomentView from '../views/CreateMomentView.vue';
 import MomentsView from '../views/MomentsView.vue';
 import ProfileView from '../views/ProfileView.vue';
 import RegisterView from '../views/RegisterView.vue';
+import SecurityView from '../views/SecurityView.vue';
 import UserHomepageView from '../views/UserHomepageView.vue';
 import { useAuthStore } from '../stores/auth';
 const router = createRouter({
@@ -28,6 +29,7 @@ const router = createRouter({
         { path: '/friend-requests', component: FriendRequestsView, meta: { requiresAuth: true } },
         { path: '/contacts', component: ContactsView, meta: { requiresAuth: true } },
         { path: '/profile', component: ProfileView, meta: { requiresAuth: true } },
+        { path: '/security', component: SecurityView, meta: { requiresAuth: true } },
         { path: '/decorations', component: DecorationsView, meta: { requiresAuth: true } },
         { path: '/users/:id', component: UserHomepageView, meta: { requiresAuth: true } }
     ]

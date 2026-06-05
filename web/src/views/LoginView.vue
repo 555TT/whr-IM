@@ -8,7 +8,7 @@ import { useAuthStore } from '../stores/auth'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const errorMessage = ref('')
+const errorMessage = ref(typeof route.query.message === 'string' ? route.query.message : '')
 const loading = ref(false)
 
 const form = reactive({
@@ -20,6 +20,13 @@ watch(
   () => route.query.username,
   (value) => {
     form.username = typeof value === 'string' ? value : ''
+  }
+)
+
+watch(
+  () => route.query.message,
+  (value) => {
+    errorMessage.value = typeof value === 'string' ? value : ''
   }
 )
 
