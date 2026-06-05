@@ -30,8 +30,9 @@ function logout() {
       <div class="nav-links">
         <router-link to="/chat">消息中心</router-link>
         <router-link to="/moments">朋友圈</router-link>
-        <router-link to="/friend-requests">通讯录申请</router-link>
+        <router-link to="/contacts">通讯录</router-link>
         <router-link to="/profile">我的名片</router-link>
+        <router-link to="/decorations">个性装扮</router-link>
       </div>
       <div class="nav-user">
         <span class="nav-user-status">● 已登录</span>

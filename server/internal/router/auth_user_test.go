@@ -128,7 +128,7 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 		t.Fatalf("expected empty publicKeyAlgorithm in profile, got %q", meResp.PublicKeyAlgorithm)
 	}
 
-	updateFemaleBody := []byte(`{"nickname":"Alice","gender":0,"signature":"hello im","homepageSkin":"sunset"}`)
+	updateFemaleBody := []byte(`{"nickname":"Alice","gender":0,"signature":"hello im","homepageSkin":"sunset","avatar":"https://cdn.example.com/avatar-a.png","avatarAccessory":"none","titleBadge":"none","homepageBackground":"plain","homepageLayout":"classic"}`)
 	updateFemaleReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader(updateFemaleBody))
 	updateFemaleReq.Header.Set("Content-Type", "application/json")
 	updateFemaleReq.Header.Set("Authorization", "Bearer "+loginResp.Token)
@@ -161,8 +161,8 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	if updateFemaleResp.Signature != "hello im" {
 		t.Fatalf("expected updated signature, got %q", updateFemaleResp.Signature)
 	}
-	if updateFemaleResp.Avatar == "" {
-		t.Fatal("expected avatar to remain populated")
+	if updateFemaleResp.Avatar != "https://cdn.example.com/avatar-a.png" {
+		t.Fatalf("expected avatar to update to uploaded url, got %q", updateFemaleResp.Avatar)
 	}
 	if updateFemaleResp.HomepageSkin != "sunset" {
 		t.Fatalf("expected homepageSkin sunset, got %q", updateFemaleResp.HomepageSkin)
@@ -174,7 +174,7 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 		t.Fatalf("expected publicKeyAlgorithm to remain empty after profile update, got %q", updateFemaleResp.PublicKeyAlgorithm)
 	}
 
-	updateMaleBody := []byte(`{"nickname":"Alice","gender":1,"signature":"hello im","homepageSkin":"galaxy"}`)
+	updateMaleBody := []byte(`{"nickname":"Alice","gender":1,"signature":"hello im","homepageSkin":"galaxy","avatar":"https://cdn.example.com/avatar-b.png","avatarAccessory":"none","titleBadge":"none","homepageBackground":"plain","homepageLayout":"classic"}`)
 	updateMaleReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader(updateMaleBody))
 	updateMaleReq.Header.Set("Content-Type", "application/json")
 	updateMaleReq.Header.Set("Authorization", "Bearer "+loginResp.Token)
@@ -188,6 +188,7 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 
 	var updateMaleResp struct {
 		Gender             int    `json:"gender"`
+		Avatar             string `json:"avatar"`
 		HomepageSkin       string `json:"homepageSkin"`
 		PublicKey          string `json:"publicKey"`
 		PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
@@ -201,11 +202,23 @@ func TestRegisterLoginAndProfileFlow(t *testing.T) {
 	if updateMaleResp.HomepageSkin != "galaxy" {
 		t.Fatalf("expected updated homepageSkin galaxy, got %q", updateMaleResp.HomepageSkin)
 	}
+	if updateMaleResp.Avatar != "https://cdn.example.com/avatar-b.png" {
+		t.Fatalf("expected updated avatar on second profile update, got %q", updateMaleResp.Avatar)
+	}
 	if updateMaleResp.PublicKey != "" {
 		t.Fatalf("expected publicKey to remain empty after second profile update, got %q", updateMaleResp.PublicKey)
 	}
 	if updateMaleResp.PublicKeyAlgorithm != "" {
 		t.Fatalf("expected publicKeyAlgorithm to remain empty after second profile update, got %q", updateMaleResp.PublicKeyAlgorithm)
+	}
+
+	repeatReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader(updateMaleBody))
+	repeatReq.Header.Set("Content-Type", "application/json")
+	repeatReq.Header.Set("Authorization", "Bearer "+loginResp.Token)
+	repeatW := httptest.NewRecorder()
+	r.ServeHTTP(repeatW, repeatReq)
+	if repeatW.Code != http.StatusOK {
+		t.Fatalf("expected repeating same profile update to still return 200, got %d with body %s", repeatW.Code, repeatW.Body.String())
 	}
 }
 
@@ -213,7 +226,7 @@ func TestUserCannotUpdateHomepageSkinWithInvalidValue(t *testing.T) {
 	r := newTestRouter(t)
 	token := registerAndLogin(t, r, "alice")
 
-	updateBody := []byte(`{"nickname":"Alice","gender":0,"signature":"hello","homepageSkin":"hacker-neon"}`)
+	updateBody := []byte(`{"nickname":"Alice","gender":0,"signature":"hello","homepageSkin":"hacker-neon","avatar":"https://cdn.example.com/avatar-c.png","avatarAccessory":"none","titleBadge":"none","homepageBackground":"plain","homepageLayout":"classic"}`)
 	updateReq := httptest.NewRequest(http.MethodPut, "/api/users/me", bytes.NewReader(updateBody))
 	updateReq.Header.Set("Content-Type", "application/json")
 	updateReq.Header.Set("Authorization", "Bearer "+token)
@@ -416,6 +429,10 @@ func newTestRouter(t *testing.T) http.Handler {
 	if err != nil {
 		t.Fatalf("failed to create gorm message repository: %v", err)
 	}
+	normalMessageRepo, err := repository.NewGormNormalMessageRepository(db)
+	if err != nil {
+		t.Fatalf("failed to create gorm normal message repository: %v", err)
+	}
 	groupRepo, err := repository.NewGormGroupRepository(db)
 	if err != nil {
 		t.Fatalf("failed to create gorm group repository: %v", err)
@@ -424,10 +441,22 @@ func newTestRouter(t *testing.T) http.Handler {
 	if err != nil {
 		t.Fatalf("failed to create gorm group message repository: %v", err)
 	}
+	normalGroupMessageRepo, err := repository.NewGormNormalGroupMessageRepository(db)
+	if err != nil {
+		t.Fatalf("failed to create gorm normal group message repository: %v", err)
+	}
 	momentRepo, err := repository.NewGormMomentRepository(db)
 	if err != nil {
 		t.Fatalf("failed to create gorm moment repository: %v", err)
 	}
+	aiChatRepo, err := repository.NewGormAIChatMessageRepository(db)
+	if err != nil {
+		t.Fatalf("failed to create gorm ai chat repository: %v", err)
+	}
+	favoriteRepo, err := repository.NewGormFavoriteRepository(db)
+	if err != nil {
+		t.Fatalf("failed to create gorm favorite repository: %v", err)
+	}
 
-	return NewWithRepositories(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo, momentRepo)
+	return NewWithRepositories(userRepo, friendRepo, messageRepo, normalMessageRepo, groupRepo, groupMessageRepo, normalGroupMessageRepo, momentRepo, aiChatRepo, favoriteRepo)
 }

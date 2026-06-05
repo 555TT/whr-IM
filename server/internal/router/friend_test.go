@@ -341,6 +341,96 @@ func TestFriendRequestCanBeRejected(t *testing.T) {
 	}
 }
 
+func TestDeleteFriendRemovesBidirectionalRelationship(t *testing.T) {
+	r := newTestRouter(t)
+
+	aliceToken := registerAndLogin(t, r, "alice")
+	bobToken := registerAndLogin(t, r, "bobby")
+
+	requestBody := []byte(`{"toUsername":"bobby","message":"add me"}`)
+	requestReq := httptest.NewRequest(http.MethodPost, "/api/friend-requests", bytes.NewReader(requestBody))
+	requestReq.Header.Set("Content-Type", "application/json")
+	requestReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	requestW := httptest.NewRecorder()
+	r.ServeHTTP(requestW, requestReq)
+	if requestW.Code != http.StatusCreated {
+		t.Fatalf("expected friend request status 201, got %d with body %s", requestW.Code, requestW.Body.String())
+	}
+
+	acceptReq := httptest.NewRequest(http.MethodPut, "/api/friend-requests/1/accept", nil)
+	acceptReq.Header.Set("Authorization", "Bearer "+bobToken)
+	acceptW := httptest.NewRecorder()
+	r.ServeHTTP(acceptW, acceptReq)
+	if acceptW.Code != http.StatusOK {
+		t.Fatalf("expected accept status 200, got %d with body %s", acceptW.Code, acceptW.Body.String())
+	}
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/friends/2", nil)
+	deleteReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	deleteW := httptest.NewRecorder()
+	r.ServeHTTP(deleteW, deleteReq)
+	if deleteW.Code != http.StatusOK {
+		t.Fatalf("expected delete friend status 200, got %d with body %s", deleteW.Code, deleteW.Body.String())
+	}
+
+	aliceFriendsReq := httptest.NewRequest(http.MethodGet, "/api/friends", nil)
+	aliceFriendsReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	aliceFriendsW := httptest.NewRecorder()
+	r.ServeHTTP(aliceFriendsW, aliceFriendsReq)
+	if aliceFriendsW.Code != http.StatusOK {
+		t.Fatalf("expected alice friends status 200, got %d with body %s", aliceFriendsW.Code, aliceFriendsW.Body.String())
+	}
+
+	bobFriendsReq := httptest.NewRequest(http.MethodGet, "/api/friends", nil)
+	bobFriendsReq.Header.Set("Authorization", "Bearer "+bobToken)
+	bobFriendsW := httptest.NewRecorder()
+	r.ServeHTTP(bobFriendsW, bobFriendsReq)
+	if bobFriendsW.Code != http.StatusOK {
+		t.Fatalf("expected bob friends status 200, got %d with body %s", bobFriendsW.Code, bobFriendsW.Body.String())
+	}
+
+	var aliceFriendsResp []map[string]any
+	if err := json.Unmarshal(aliceFriendsW.Body.Bytes(), &aliceFriendsResp); err != nil {
+		t.Fatalf("expected valid alice friends response json, got error: %v", err)
+	}
+	if len(aliceFriendsResp) != 0 {
+		t.Fatalf("expected alice to have no friends after deletion, got %d", len(aliceFriendsResp))
+	}
+
+	var bobFriendsResp []map[string]any
+	if err := json.Unmarshal(bobFriendsW.Body.Bytes(), &bobFriendsResp); err != nil {
+		t.Fatalf("expected valid bob friends response json, got error: %v", err)
+	}
+	if len(bobFriendsResp) != 0 {
+		t.Fatalf("expected bob to have no friends after deletion, got %d", len(bobFriendsResp))
+	}
+}
+
+func TestDeleteFriendReturnsNotFoundWhenUsersAreNotFriends(t *testing.T) {
+	r := newTestRouter(t)
+
+	aliceToken := registerAndLogin(t, r, "alice")
+	registerAndLogin(t, r, "bobby")
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/friends/2", nil)
+	deleteReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	deleteW := httptest.NewRecorder()
+	r.ServeHTTP(deleteW, deleteReq)
+	if deleteW.Code != http.StatusNotFound {
+		t.Fatalf("expected delete non-friend status 404, got %d with body %s", deleteW.Code, deleteW.Body.String())
+	}
+
+	var errorResp struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(deleteW.Body.Bytes(), &errorResp); err != nil {
+		t.Fatalf("expected valid delete non-friend response json, got error: %v", err)
+	}
+	if errorResp.Message != "该用户不是你的好友" {
+		t.Fatalf("expected not-friend message, got %q", errorResp.Message)
+	}
+}
+
 func registerAndLogin(t *testing.T, r http.Handler, username string) string {
 	t.Helper()
 

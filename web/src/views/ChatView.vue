@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import AppNav from '../components/AppNav.vue'
 import CreateGroupModal from '../components/CreateGroupModal.vue'
@@ -8,25 +9,6 @@ import { http } from '../api/http'
 import { resolveHomepageSkin } from '../constants/homepageSkins'
 import { useAuthStore } from '../stores/auth'
 import { formatChatMessageTime } from '../utils/chat-time'
-import {
-  buildEncryptedMessageDisplay,
-  decryptMessage,
-  E2EE_MESSAGE_ALGORITHM,
-  encryptMessage,
-  exportPrivateKey,
-  exportPublicKey,
-  generateKeyPair,
-  importPrivateKey,
-  importPublicKey,
-  loadPrivateKey,
-  savePrivateKey,
-  selectMessagePayloadForUser
-} from '../utils/e2ee'
-import {
-  buildGroupMessageEnvelope,
-  decryptGroupMessage,
-  GROUP_CONTENT_ALGORITHM
-} from '../utils/group-e2ee'
 import { createChatSocket } from '../utils/websocket'
 
 interface FriendItem {
@@ -35,18 +17,13 @@ interface FriendItem {
   nickname: string
   avatar: string
   signature: string
-  publicKey?: string
-  publicKeyAlgorithm?: string
 }
 
 interface ChatMessage {
   id?: number
   senderId: number
   receiverId: number
-  senderCiphertext: string
-  senderAlgorithm: string
-  receiverCiphertext: string
-  receiverAlgorithm: string
+  content: string
   createdAt?: string
 }
 
@@ -62,8 +39,6 @@ interface GroupMember {
   username: string
   nickname: string
   avatar: string
-  publicKey?: string
-  publicKeyAlgorithm?: string
 }
 
 interface GroupDetail {
@@ -77,25 +52,18 @@ interface GroupMessage {
   id: number
   groupId: number
   senderId: number
-  contentCiphertext: string
-  contentIv: string
-  contentAlgorithm: string
-  keyCiphertext: string
-  keyAlgorithm: string
+  content: string
   createdAt?: string
 }
 
 // 渲染层统一形态:文本 + 时间 + 发送者(单聊/群聊都满足)
 interface RenderMessage {
+  renderKey: string
   id?: number
   senderId: number
-  // 单聊字段(可选,仅单聊用)
   receiverId?: number
-  senderCiphertext?: string
-  receiverCiphertext?: string
-  // 群聊字段(可选)
   groupId?: number
-  // 渲染数据
+  sourceType?: 'friend' | 'group'
   content: string
   createdAt?: string
 }
@@ -103,6 +71,7 @@ interface RenderMessage {
 type ConversationType = 'friend' | 'group'
 
 const authStore = useAuthStore()
+const router = useRouter()
 const skin = computed(() => resolveHomepageSkin(authStore.user?.homepageSkin))
 const friends = ref<FriendItem[]>([])
 const groups = ref<GroupListItem[]>([])
@@ -114,13 +83,13 @@ const currentGroupDetail = ref<GroupDetail | null>(null)
 const sidebarTab = ref<'friend' | 'group'>('friend')
 const draft = ref('')
 const errorMessage = ref('')
-const cryptoReady = ref(true) // 端到端加密是否就绪，未就绪时禁用发送
 const socketConnected = ref(false)
 const sending = ref(false)
-const privateKey = ref<CryptoKey | null>(null)
 const messageListRef = ref<HTMLElement | null>(null)
 const showCreateGroup = ref(false)
 const showGroupInfo = ref(false)
+const selectionMode = ref(false)
+const selectedMessageKeys = ref<string[]>([])
 let socket: WebSocket | null = null
 
 const currentFriend = computed(() => friends.value.find((item) => item.friendId === currentFriendId.value) || null)
@@ -130,6 +99,38 @@ const currentConversationHint = computed(() => {
   if (conversationType.value === 'group') return currentGroupDetail.value ? `${currentGroupDetail.value.members.length} 位成员参与会话` : '群组会话已开启'
   return '选择联系人后可开始发送实时消息'
 })
+const canSendMessage = computed(() => !!conversationType.value && !selectionMode.value && !sending.value)
+const composerStatusText = computed(() => {
+  if (!conversationType.value) return '待选择会话'
+  if (selectionMode.value) return '选择模式中'
+  return '可发送'
+})
+const headerActionLabel = computed(() => {
+  if (conversationType.value === 'group') return '群信息'
+  if (conversationType.value === 'friend') return '返回消息中心'
+  return sidebarTab.value === 'group' ? '刷新群聊' : '刷新好友'
+})
+
+async function handleHeaderAction() {
+  errorMessage.value = ''
+  if (conversationType.value === 'group') {
+    showGroupInfo.value = true
+    return
+  }
+  if (conversationType.value === 'friend') {
+    backToList()
+    return
+  }
+  try {
+    if (sidebarTab.value === 'group') {
+      await loadGroups()
+      return
+    }
+    await loadFriends()
+  } catch (error) {
+    errorMessage.value = (error as Error).message
+  }
+}
 
 // 当前在聊会话(群或好友)的展示标题
 const conversationTitle = computed(() => {
@@ -145,89 +146,30 @@ function groupMemberDisplayName(senderId: number) {
   return m ? m.nickname || m.username : String(senderId)
 }
 
-async function uploadOwnPublicKey(serializedPublicKey: string) {
-  await http.put('/users/me/public-key', {
-    publicKey: serializedPublicKey,
-    algorithm: E2EE_MESSAGE_ALGORITHM
-  })
-
-  authStore.user = authStore.user
-    ? {
-        ...authStore.user,
-        publicKey: serializedPublicKey,
-        publicKeyAlgorithm: E2EE_MESSAGE_ALGORITHM
-      }
-    : null
-}
-
-async function exportPublicKeyFromPrivateKey(serializedPrivateKey: string) {
-  const importedPrivateKey = await importPrivateKey(serializedPrivateKey)
-  const jwk = await window.crypto.subtle.exportKey('jwk', importedPrivateKey)
-  const publicKey = await window.crypto.subtle.importKey(
-    'jwk',
-    {
-      kty: jwk.kty,
-      n: jwk.n,
-      e: jwk.e,
-      alg: jwk.alg,
-      ext: true,
-      key_ops: ['encrypt']
-    },
-    { name: 'RSA-OAEP', hash: 'SHA-256' },
-    true,
-    ['encrypt']
-  )
-
-  return exportPublicKey(publicKey)
-}
-
-async function ensureOwnKeyPair() {
-  if (!authStore.user?.id) return
-
-  const storedPrivateKey = loadPrivateKey(authStore.user.id)
-  if (storedPrivateKey) {
-    privateKey.value = await importPrivateKey(storedPrivateKey)
-
-    if (authStore.user.publicKey && authStore.user.publicKeyAlgorithm === E2EE_MESSAGE_ALGORITHM) {
-      return
-    }
-
-    const serializedPublicKey = await exportPublicKeyFromPrivateKey(storedPrivateKey)
-    await uploadOwnPublicKey(serializedPublicKey)
-    return
+function buildRenderKey(message: Omit<RenderMessage, 'renderKey'>) {
+  if (message.id) {
+    return `${message.sourceType || 'friend'}-${message.id}`
   }
 
-  const keyPair = await generateKeyPair()
-  const serializedPublicKey = await exportPublicKey(keyPair.publicKey)
-  const serializedPrivateKey = await exportPrivateKey(keyPair.privateKey)
-
-  savePrivateKey(authStore.user.id, serializedPrivateKey)
-  privateKey.value = keyPair.privateKey
-
-  await uploadOwnPublicKey(serializedPublicKey)
+  return [
+    message.sourceType || 'friend',
+    message.senderId,
+    message.receiverId ?? 'na',
+    message.groupId ?? 'na',
+    message.createdAt ?? 'na',
+    message.content
+  ].join('-')
 }
 
-async function toRenderMessage(message: ChatMessage): Promise<RenderMessage> {
-  const payload = selectMessagePayloadForUser(message, authStore.user?.id)
-
-  if (!privateKey.value) {
-    return {
-      ...message,
-      ...buildEncryptedMessageDisplay('', payload)
-    }
+function toRenderMessage(message: ChatMessage): RenderMessage {
+  const renderMessage = {
+    ...message,
+    sourceType: 'friend' as const
   }
 
-  try {
-    const content = await decryptMessage(privateKey.value, payload.ciphertext)
-    return {
-      ...message,
-      ...buildEncryptedMessageDisplay(content, payload)
-    }
-  } catch {
-    return {
-      ...message,
-      ...buildEncryptedMessageDisplay('', payload)
-    }
+  return {
+    ...renderMessage,
+    renderKey: buildRenderKey(renderMessage)
   }
 }
 
@@ -246,31 +188,21 @@ async function loadFriendMessages() {
     messages.value = []
     return
   }
-  const { data } = await http.get(`/messages?friendId=${currentFriendId.value}`)
-  messages.value = await Promise.all((data as ChatMessage[]).map(toRenderMessage))
+  const { data } = await http.get(`/normal-messages?friendId=${currentFriendId.value}`)
+  messages.value = (data as ChatMessage[]).map(toRenderMessage)
   await scrollToBottom()
 }
 
-async function toGroupRenderMessage(message: GroupMessage): Promise<RenderMessage> {
-  const base: RenderMessage = {
-    id: message.id,
-    senderId: message.senderId,
-    groupId: message.groupId,
-    content: '***（已加密）',
-    createdAt: message.createdAt
+function toGroupRenderMessage(message: GroupMessage): RenderMessage {
+  const renderMessage = {
+    ...message,
+    sourceType: 'group' as const
   }
-  if (!privateKey.value) return base
-  try {
-    base.content = await decryptGroupMessage(
-      privateKey.value,
-      message.keyCiphertext,
-      message.contentCiphertext,
-      message.contentIv
-    )
-  } catch {
-    // 保持加密占位
+
+  return {
+    ...renderMessage,
+    renderKey: buildRenderKey(renderMessage)
   }
-  return base
 }
 
 async function loadGroupMessages() {
@@ -278,8 +210,8 @@ async function loadGroupMessages() {
     messages.value = []
     return
   }
-  const { data } = await http.get(`/groups/${currentGroupId.value}/messages`)
-  messages.value = await Promise.all((data as GroupMessage[]).map(toGroupRenderMessage))
+  const { data } = await http.get(`/groups/${currentGroupId.value}/normal-messages`)
+  messages.value = (data as GroupMessage[]).map(toGroupRenderMessage)
   await scrollToBottom()
 }
 
@@ -289,6 +221,7 @@ async function loadGroupDetail(groupId: number) {
 }
 
 async function selectFriend(friendId: number) {
+  clearSelection()
   conversationType.value = 'friend'
   currentFriendId.value = friendId
   currentGroupId.value = null
@@ -297,6 +230,7 @@ async function selectFriend(friendId: number) {
 }
 
 async function selectGroup(groupId: number) {
+  clearSelection()
   conversationType.value = 'group'
   currentGroupId.value = groupId
   currentFriendId.value = null
@@ -309,7 +243,7 @@ async function selectGroup(groupId: number) {
 }
 
 async function sendMessage() {
-  if (!draft.value.trim() || sending.value) return
+  if (!canSendMessage.value || !draft.value.trim()) return
   errorMessage.value = ''
 
   if (conversationType.value === 'friend') {
@@ -322,37 +256,14 @@ async function sendMessage() {
 async function sendFriendMessage() {
   if (!currentFriendId.value) return
 
-  if (!privateKey.value) {
-    errorMessage.value = '当前设备没有可用私钥'
-    return
-  }
-
-  const friend = currentFriend.value
-  if (!friend?.publicKey) {
-    errorMessage.value = '对方未启用端到端加密消息'
-    return
-  }
-
-  if (!authStore.user?.publicKey) {
-    errorMessage.value = '当前账号公钥不可用'
-    return
-  }
-
   sending.value = true
   try {
-    const receiverPublicKey = await importPublicKey(friend.publicKey)
-    const senderPublicKey = await importPublicKey(authStore.user.publicKey)
     const content = draft.value.trim()
-    const receiverEncrypted = await encryptMessage(receiverPublicKey, content)
-    const senderEncrypted = await encryptMessage(senderPublicKey, content)
-    const { data } = await http.post('/messages', {
+    const { data } = await http.post('/normal-messages', {
       receiverId: currentFriendId.value,
-      senderCiphertext: senderEncrypted.ciphertext,
-      senderAlgorithm: senderEncrypted.algorithm,
-      receiverCiphertext: receiverEncrypted.ciphertext,
-      receiverAlgorithm: receiverEncrypted.algorithm
+      content
     })
-    messages.value.push(await toRenderMessage(data as ChatMessage))
+    messages.value.push(toRenderMessage(data as ChatMessage))
     draft.value = ''
     await scrollToBottom()
   } catch (error) {
@@ -364,32 +275,14 @@ async function sendFriendMessage() {
 
 async function sendGroupMessage() {
   if (!currentGroupId.value) return
-  if (!privateKey.value) {
-    errorMessage.value = '当前设备没有可用私钥'
-    return
-  }
 
-  // 发消息前刷新一次成员列表,避免缺漏新成员的密钥包裹
   sending.value = true
   try {
-    await loadGroupDetail(currentGroupId.value)
-    const detail = currentGroupDetail.value
-    if (!detail) throw new Error('群信息加载失败')
-
-    const members = detail.members.map((m) => ({
-      userId: m.userId,
-      publicKey: m.publicKey || '',
-      publicKeyAlgorithm: m.publicKeyAlgorithm || ''
-    }))
     const content = draft.value.trim()
-    const envelope = await buildGroupMessageEnvelope(content, members)
-    const { data } = await http.post(`/groups/${currentGroupId.value}/messages`, {
-      contentCiphertext: envelope.contentCiphertext,
-      contentIv: envelope.contentIv,
-      contentAlgorithm: envelope.contentAlgorithm,
-      memberKeys: envelope.memberKeys
+    const { data } = await http.post(`/groups/${currentGroupId.value}/normal-messages`, {
+      content
     })
-    messages.value.push(await toGroupRenderMessage(data as GroupMessage))
+    messages.value.push(toGroupRenderMessage(data as GroupMessage))
     draft.value = ''
     await scrollToBottom()
   } catch (error) {
@@ -458,25 +351,24 @@ function connectSocket() {
   }
   socket.onmessage = async (event) => {
     const payload = JSON.parse(event.data)
-    if (payload.type === 'chat_message') {
+    if (payload.type === 'normal_chat_message') {
       const chatMessage = payload.data as ChatMessage
       if (
         conversationType.value === 'friend' &&
         currentFriendId.value &&
         (chatMessage.senderId === currentFriendId.value || chatMessage.receiverId === currentFriendId.value)
       ) {
-        messages.value.push(await toRenderMessage(chatMessage))
+        messages.value.push(toRenderMessage(chatMessage))
         await scrollToBottom()
       }
-    } else if (payload.type === 'group_message') {
+    } else if (payload.type === 'normal_group_message') {
       const groupMessage = payload.data as GroupMessage
-      // 自己发的消息已经在 sendGroupMessage 里 push 过,避免重复
       if (groupMessage.senderId === authStore.user?.id) return
       if (
         conversationType.value === 'group' &&
         currentGroupId.value === groupMessage.groupId
       ) {
-        messages.value.push(await toGroupRenderMessage(groupMessage))
+        messages.value.push(toGroupRenderMessage(groupMessage))
         await scrollToBottom()
       }
     }
@@ -494,7 +386,69 @@ watch(messages, () => {
   scrollToBottom()
 }, { deep: true })
 
+function friendAvatarUrl(friend: FriendItem) {
+  return friend.avatar || ''
+}
+
+function messageKey(message: RenderMessage) {
+  return message.renderKey
+}
+
+function isSelected(message: RenderMessage) {
+  return selectedMessageKeys.value.includes(messageKey(message))
+}
+
+function openAIChat() {
+  router.push('/ai-chat')
+}
+
+function openEncryptedChat() {
+  router.push('/encrypted-chat')
+}
+
+function openFavorites() {
+  router.push('/favorites')
+}
+
+function enterSelectionMode(message: RenderMessage) {
+  selectionMode.value = true
+  toggleSelection(message)
+}
+
+function toggleSelection(message: RenderMessage) {
+  const key = messageKey(message)
+  if (selectedMessageKeys.value.includes(key)) {
+    selectedMessageKeys.value = selectedMessageKeys.value.filter((item) => item !== key)
+    if (selectedMessageKeys.value.length === 0) {
+      selectionMode.value = false
+    }
+    return
+  }
+  selectedMessageKeys.value = [...selectedMessageKeys.value, key]
+}
+
+async function favoriteSelectedMessages() {
+  if (selectedMessageKeys.value.length === 0) return
+  errorMessage.value = ''
+  const selected = messages.value.filter((message) => isSelected(message) && message.id && message.sourceType)
+  try {
+    await http.post('/favorites', {
+      items: selected.map((message) => ({ sourceType: message.sourceType, sourceMessageId: message.id, content: message.content }))
+    })
+    selectionMode.value = false
+    selectedMessageKeys.value = []
+  } catch (error) {
+    errorMessage.value = (error as Error).message
+  }
+}
+
+function clearSelection() {
+  selectionMode.value = false
+  selectedMessageKeys.value = []
+}
+
 function backToList() {
+  clearSelection()
   conversationType.value = null
   currentFriendId.value = null
   currentGroupId.value = null
@@ -508,14 +462,6 @@ onMounted(async () => {
   } catch (error) {
     errorMessage.value = (error as Error).message
     return
-  }
-
-  // 加密初始化失败不应阻断好友列表与历史消息的展示，因此独立 try
-  try {
-    await ensureOwnKeyPair()
-  } catch (error) {
-    cryptoReady.value = false
-    errorMessage.value = (error as Error).message
   }
 
   try {
@@ -557,6 +503,30 @@ onBeforeUnmount(() => {
           </div>
           <small class="muted">{{ totalConversationCount }} 个会话</small>
         </div>
+        <button class="ai-entry-card" type="button" @click="openAIChat">
+          <div>
+            <p class="apple-label">AI Assistant</p>
+            <strong>AI 助手</strong>
+            <span>和智能助手聊一聊</span>
+          </div>
+          <span class="ai-entry-arrow">→</span>
+        </button>
+        <button class="encrypted-entry-card" type="button" @click="openEncryptedChat">
+          <div>
+            <p class="apple-label">Encrypted Channel</p>
+            <strong>加密通道</strong>
+            <span>进入端到端加密消息页</span>
+          </div>
+          <span class="encrypted-entry-arrow">⇢</span>
+        </button>
+        <button class="favorite-entry-card" type="button" @click="openFavorites">
+          <div>
+            <p class="apple-label">My Favorites</p>
+            <strong>我的收藏</strong>
+            <span>统一查看已收藏消息</span>
+          </div>
+          <span class="favorite-entry-arrow">★</span>
+        </button>
         <div class="sidebar-tabs">
           <button
             class="tab-btn"
@@ -579,7 +549,8 @@ onBeforeUnmount(() => {
             :class="{ active: conversationType === 'friend' && currentFriendId === friend.friendId }"
             @click="selectFriend(friend.friendId)"
           >
-            <div class="friend-avatar">{{ friend.nickname.slice(0, 1).toUpperCase() }}</div>
+            <img v-if="friendAvatarUrl(friend)" :src="friend.avatar" alt="avatar" class="friend-avatar avatar-image" />
+            <div v-else class="friend-avatar">{{ friend.nickname.slice(0, 1).toUpperCase() }}</div>
             <div class="friend-copy">
               <strong>{{ friend.nickname }}</strong>
               <span>{{ friend.signature || '这个人很懒，还没写签名。' }}</span>
@@ -615,13 +586,22 @@ onBeforeUnmount(() => {
             <small class="muted">{{ currentConversationHint }}</small>
             <small class="muted" v-if="authStore.user">当前身份：{{ authStore.user.nickname || authStore.user.username }}</small>
           </div>
-          <button v-if="conversationType === 'group'" class="apple-button secondary refresh-btn" @click="showGroupInfo = true">群信息</button>
-          <button v-else class="apple-button secondary refresh-btn" @click="loadFriends">刷新好友</button>
+          <button
+            class="apple-button secondary refresh-btn"
+            type="button"
+            @click="handleHeaderAction"
+          >
+            {{ headerActionLabel }}
+          </button>
         </div>
         <p v-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
-        <p v-if="!cryptoReady && !errorMessage" class="status-text error">
-          当前环境不支持端到端加密，仅可查看已有会话。
-        </p>
+        <div v-if="selectionMode" class="selection-toolbar">
+          <span>已选 {{ selectedMessageKeys.length }} 条</span>
+          <div class="selection-actions">
+            <button class="apple-button secondary" type="button" @click="clearSelection">取消选择</button>
+            <button class="apple-button" type="button" @click="favoriteSelectedMessages">收藏</button>
+          </div>
+        </div>
         <div v-if="!conversationType" class="empty-state chat-empty-state">
           <div class="empty-illustration">💬</div>
           <strong>这里是 IM 实时会话区</strong>
@@ -629,12 +609,13 @@ onBeforeUnmount(() => {
         </div>
         <div v-else ref="messageListRef" class="messages">
           <div
-            v-for="(message, index) in messages"
-            :key="index"
+            v-for="message in messages"
+            :key="message.renderKey"
             class="message-row"
             :class="{ mine: isMine(message) }"
+            @contextmenu.prevent="enterSelectionMode(message)"
           >
-            <div class="message-item">
+            <div class="message-item" :class="{ selected: isSelected(message) }" @click="selectionMode ? toggleSelection(message) : undefined">
               <div class="message-meta">
                 <strong>
                   {{
@@ -653,19 +634,19 @@ onBeforeUnmount(() => {
         </div>
         <div class="composer">
           <div class="composer-meta">
-            <span>加密通道</span>
-            <strong>{{ cryptoReady ? '已开启' : '不可用' }}</strong>
+            <span>普通消息</span>
+            <strong>{{ composerStatusText }}</strong>
           </div>
           <input
             v-model="draft"
             class="apple-input"
-            :disabled="!conversationType || sending || !cryptoReady"
-            :placeholder="cryptoReady ? '输入消息，按回车发送' : '当前环境不支持发送加密消息'"
+            :disabled="!canSendMessage"
+            placeholder="输入消息，按回车发送"
             @keyup.enter="sendMessage"
           />
           <button
             class="apple-button"
-            :disabled="!conversationType || sending || !cryptoReady"
+            :disabled="!canSendMessage"
             @click="sendMessage"
           >
             {{ sending ? '发送中...' : '发送' }}
@@ -676,7 +657,7 @@ onBeforeUnmount(() => {
 
     <CreateGroupModal
       :visible="showCreateGroup"
-      :friends="friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname, publicKey: f.publicKey }))"
+      :friends="friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname }))"
       @close="showCreateGroup = false"
       @submit="handleCreateGroup"
     />
@@ -687,7 +668,7 @@ onBeforeUnmount(() => {
       :owner-id="currentGroupDetail?.ownerId || 0"
       :members="currentGroupDetail?.members || []"
       :my-user-id="authStore.user?.id ?? null"
-      :friends="friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname, publicKey: f.publicKey }))"
+      :friends="friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname }))"
       @close="showGroupInfo = false"
       @invite="handleInviteMembers"
       @leave="handleLeaveGroup"
@@ -765,6 +746,123 @@ onBeforeUnmount(() => {
 
 .signal-pill.online {
   color: #0f9d58;
+}
+
+.ai-entry-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border: none;
+  border-radius: 22px;
+  cursor: pointer;
+  text-align: left;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(59, 130, 246, 0.16));
+  box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.12);
+}
+
+.ai-entry-card strong {
+  display: block;
+  margin-top: 4px;
+  color: #1d1d1f;
+  font-size: 18px;
+}
+
+.ai-entry-card span {
+  display: block;
+  margin-top: 4px;
+  color: #425466;
+  font-size: 13px;
+}
+
+.ai-entry-arrow {
+  font-size: 24px;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.encrypted-entry-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border: none;
+  border-radius: 22px;
+  cursor: pointer;
+  text-align: left;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(59, 130, 246, 0.16));
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.12);
+}
+
+.encrypted-entry-card strong {
+  display: block;
+  margin-top: 4px;
+  color: #1d1d1f;
+  font-size: 18px;
+}
+
+.encrypted-entry-card span {
+  display: block;
+  margin-top: 4px;
+  color: #425466;
+  font-size: 13px;
+}
+
+.encrypted-entry-arrow {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f9d58;
+}
+
+.favorite-entry-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border: none;
+  border-radius: 22px;
+  cursor: pointer;
+  text-align: left;
+  background: linear-gradient(135deg, rgba(255, 184, 0, 0.16), rgba(255, 99, 71, 0.16));
+  box-shadow: inset 0 0 0 1px rgba(255, 184, 0, 0.12);
+}
+
+.favorite-entry-card strong {
+  display: block;
+  margin-top: 4px;
+  color: #1d1d1f;
+  font-size: 18px;
+}
+
+.favorite-entry-card span {
+  display: block;
+  margin-top: 4px;
+  color: #425466;
+  font-size: 13px;
+}
+
+.favorite-entry-arrow {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ff8c00;
+}
+
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  background: rgba(255, 248, 230, 0.96);
+  border-radius: 18px;
+}
+
+.selection-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .sidebar-top,
@@ -884,6 +982,12 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
+.avatar-image {
+  object-fit: cover;
+  display: block;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+}
+
 .friend-avatar.group {
   background: linear-gradient(180deg, #fff5d6 0%, #ffe7a8 100%);
   color: #b25e00;
@@ -963,6 +1067,10 @@ onBeforeUnmount(() => {
   border-radius: 22px;
   background: rgba(245, 245, 247, 0.95);
   box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.04);
+}
+
+.message-item.selected {
+  box-shadow: inset 0 0 0 2px rgba(255, 140, 0, 0.45), 0 12px 28px rgba(15, 23, 42, 0.08);
 }
 
 .message-row.mine .message-item {

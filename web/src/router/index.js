@@ -1,7 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import ChatView from '../views/ChatView.vue';
+import AIChatView from '../views/AIChatView.vue';
+import EncryptedChatView from '../views/EncryptedChatView.vue';
+import FavoritesView from '../views/FavoritesView.vue';
 import FriendRequestsView from '../views/FriendRequestsView.vue';
+import ContactsView from '../views/ContactsView.vue';
+import DecorationsView from '../views/DecorationsView.vue';
 import LoginView from '../views/LoginView.vue';
+import CreateMomentView from '../views/CreateMomentView.vue';
 import MomentsView from '../views/MomentsView.vue';
 import ProfileView from '../views/ProfileView.vue';
 import RegisterView from '../views/RegisterView.vue';
@@ -14,9 +20,15 @@ const router = createRouter({
         { path: '/login', component: LoginView, meta: { guestOnly: true } },
         { path: '/register', component: RegisterView, meta: { guestOnly: true } },
         { path: '/chat', component: ChatView, meta: { requiresAuth: true } },
+        { path: '/ai-chat', component: AIChatView, meta: { requiresAuth: true } },
+        { path: '/encrypted-chat', component: EncryptedChatView, meta: { requiresAuth: true } },
+        { path: '/favorites', component: FavoritesView, meta: { requiresAuth: true } },
         { path: '/moments', component: MomentsView, meta: { requiresAuth: true } },
+        { path: '/moments/create', component: CreateMomentView, meta: { requiresAuth: true } },
         { path: '/friend-requests', component: FriendRequestsView, meta: { requiresAuth: true } },
+        { path: '/contacts', component: ContactsView, meta: { requiresAuth: true } },
         { path: '/profile', component: ProfileView, meta: { requiresAuth: true } },
+        { path: '/decorations', component: DecorationsView, meta: { requiresAuth: true } },
         { path: '/users/:id', component: UserHomepageView, meta: { requiresAuth: true } }
     ]
 });

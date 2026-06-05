@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import AppNav from '../components/AppNav.vue'
 import { http } from '../api/http'
@@ -13,6 +13,10 @@ interface PublicProfile {
   avatar: string
   signature: string
   homepageSkin: string
+  avatarAccessory: string
+  titleBadge: string
+  homepageBackground: string
+  homepageLayout: string
 }
 
 interface MomentCommentItem {
@@ -37,12 +41,18 @@ interface MomentItem {
 }
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const profile = ref<PublicProfile | null>(null)
 const moments = ref<MomentItem[]>([])
 const loading = ref(false)
+const deletingFriend = ref(false)
+const feedback = ref('')
 const errorMessage = ref('')
 const commentDrafts = ref<Record<number, string>>({})
+const isFriendProfile = ref(false)
+
+const isSelfHomepage = computed(() => authStore.user?.id === profile.value?.id)
 
 function currentUserId() {
   return Number(route.params.id)
@@ -51,18 +61,22 @@ function currentUserId() {
 async function loadHomepage() {
   loading.value = true
   errorMessage.value = ''
+  feedback.value = ''
   commentDrafts.value = {}
   try {
     const userId = currentUserId()
-    const [{ data: profileData }, { data: momentsData }] = await Promise.all([
+    const [{ data: profileData }, { data: momentsData }, { data: friendsData }] = await Promise.all([
       http.get(`/users/${userId}/profile`),
-      http.get(`/users/${userId}/moments`)
+      http.get(`/users/${userId}/moments`),
+      http.get('/friends')
     ])
     profile.value = profileData
     moments.value = momentsData
+    isFriendProfile.value = (friendsData as { friendId: number }[]).some((item) => item.friendId === userId)
   } catch (error) {
     profile.value = null
     moments.value = []
+    isFriendProfile.value = false
     errorMessage.value = (error as Error).message
   } finally {
     loading.value = false
@@ -106,8 +120,29 @@ async function deleteMoment(item: MomentItem) {
   }
 }
 
+async function deleteFriend() {
+  if (!profile.value || isSelfHomepage.value) return
+  if (!window.confirm(`确认删除好友“${profile.value.nickname}”吗？`)) return
+
+  deletingFriend.value = true
+  errorMessage.value = ''
+  feedback.value = ''
+  try {
+    await http.delete(`/friends/${profile.value.id}`)
+    await router.push({ path: '/contacts', state: { friendDeletedMessage: '好友已删除' } })
+  } catch (error) {
+    errorMessage.value = (error as Error).message
+  } finally {
+    deletingFriend.value = false
+  }
+}
+
 function homepageSkinClass() {
   return resolveHomepageSkin(profile.value?.homepageSkin).surfaceClass
+}
+
+function homepageBackgroundClass() {
+  return profile.value?.homepageBackground || 'plain'
 }
 
 watch(() => route.params.id, loadHomepage)
@@ -118,15 +153,30 @@ onMounted(loadHomepage)
   <div class="page-shell apple-page">
     <AppNav />
     <section class="homepage-layout">
-      <div class="card apple-panel homepage-profile" :class="homepageSkinClass()" v-if="profile">
+      <div class="card apple-panel homepage-profile" :class="[homepageSkinClass(), homepageBackgroundClass(), profile?.homepageLayout]" v-if="profile">
         <div class="profile-top">
-          <img :src="profile.avatar" alt="avatar" class="homepage-avatar" />
-          <div>
+          <div class="avatar-wrap" :class="profile.avatarAccessory">
+            <img :src="profile.avatar" alt="avatar" class="homepage-avatar" />
+          </div>
+          <div class="profile-main">
             <p class="apple-label">Homepage</p>
-            <h1>{{ profile.nickname }}</h1>
+            <div class="profile-title-row">
+              <h1>{{ profile.nickname }}</h1>
+              <span v-if="profile.titleBadge && profile.titleBadge !== 'none'" class="title-badge">{{ profile.titleBadge }}</span>
+            </div>
             <p class="muted">{{ profile.signature || '这个人很低调，还没有留下签名。' }}</p>
           </div>
+          <button
+            v-if="!isSelfHomepage && isFriendProfile"
+            class="apple-button danger delete-friend-btn"
+            type="button"
+            :disabled="deletingFriend"
+            @click="deleteFriend"
+          >
+            {{ deletingFriend ? '删除中...' : '删除好友' }}
+          </button>
         </div>
+        <p v-if="feedback" class="status-text success">{{ feedback }}</p>
       </div>
 
       <div class="feed-column">
@@ -208,6 +258,76 @@ onMounted(loadHomepage)
   display: flex;
   align-items: center;
   gap: 20px;
+}
+
+.profile-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.profile-main {
+  flex: 1;
+}
+
+.avatar-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.avatar-wrap.star-ring {
+  box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.45);
+  border-radius: 32px;
+}
+
+.avatar-wrap.flower-crown::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: -6px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(244, 114, 182, 0.72);
+}
+
+.avatar-wrap.spark-frame {
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.35), 0 0 18px rgba(255, 255, 255, 0.28);
+  border-radius: 32px;
+}
+
+.title-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.homepage-profile.soft-glow {
+  box-shadow: 0 18px 32px rgba(125, 211, 252, 0.24);
+}
+
+.homepage-profile.starry {
+  background-image: radial-gradient(circle at top right, rgba(255, 255, 255, 0.28), transparent 32%);
+}
+
+.homepage-profile.mint-fog {
+  background-image: linear-gradient(135deg, rgba(52, 211, 153, 0.22), rgba(255, 255, 255, 0.08));
+}
+
+.homepage-profile.poster .profile-top {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.homepage-profile.split .profile-top {
+  justify-content: space-between;
+}
+
+.delete-friend-btn {
+  margin-left: auto;
 }
 
 .homepage-avatar {

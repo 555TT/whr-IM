@@ -1,4 +1,5 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import AppNav from '../components/AppNav.vue';
 import CreateGroupModal from '../components/CreateGroupModal.vue';
 import GroupInfoPanel from '../components/GroupInfoPanel.vue';
@@ -6,10 +7,9 @@ import { http } from '../api/http';
 import { resolveHomepageSkin } from '../constants/homepageSkins';
 import { useAuthStore } from '../stores/auth';
 import { formatChatMessageTime } from '../utils/chat-time';
-import { buildEncryptedMessageDisplay, decryptMessage, E2EE_MESSAGE_ALGORITHM, encryptMessage, exportPrivateKey, exportPublicKey, generateKeyPair, importPrivateKey, importPublicKey, loadPrivateKey, savePrivateKey, selectMessagePayloadForUser } from '../utils/e2ee';
-import { buildGroupMessageEnvelope, decryptGroupMessage } from '../utils/group-e2ee';
 import { createChatSocket } from '../utils/websocket';
 const authStore = useAuthStore();
+const router = useRouter();
 const skin = computed(() => resolveHomepageSkin(authStore.user?.homepageSkin));
 const friends = ref([]);
 const groups = ref([]);
@@ -21,13 +21,13 @@ const currentGroupDetail = ref(null);
 const sidebarTab = ref('friend');
 const draft = ref('');
 const errorMessage = ref('');
-const cryptoReady = ref(true); // 端到端加密是否就绪，未就绪时禁用发送
 const socketConnected = ref(false);
 const sending = ref(false);
-const privateKey = ref(null);
 const messageListRef = ref(null);
 const showCreateGroup = ref(false);
 const showGroupInfo = ref(false);
+const selectionMode = ref(false);
+const selectedMessageKeys = ref([]);
 let socket = null;
 const currentFriend = computed(() => friends.value.find((item) => item.friendId === currentFriendId.value) || null);
 const totalConversationCount = computed(() => friends.value.length + groups.value.length);
@@ -38,6 +38,42 @@ const currentConversationHint = computed(() => {
         return currentGroupDetail.value ? `${currentGroupDetail.value.members.length} 位成员参与会话` : '群组会话已开启';
     return '选择联系人后可开始发送实时消息';
 });
+const canSendMessage = computed(() => !!conversationType.value && !selectionMode.value && !sending.value);
+const composerStatusText = computed(() => {
+    if (!conversationType.value)
+        return '待选择会话';
+    if (selectionMode.value)
+        return '选择模式中';
+    return '可发送';
+});
+const headerActionLabel = computed(() => {
+    if (conversationType.value === 'group')
+        return '群信息';
+    if (conversationType.value === 'friend')
+        return '返回消息中心';
+    return sidebarTab.value === 'group' ? '刷新群聊' : '刷新好友';
+});
+async function handleHeaderAction() {
+    errorMessage.value = '';
+    if (conversationType.value === 'group') {
+        showGroupInfo.value = true;
+        return;
+    }
+    if (conversationType.value === 'friend') {
+        backToList();
+        return;
+    }
+    try {
+        if (sidebarTab.value === 'group') {
+            await loadGroups();
+            return;
+        }
+        await loadFriends();
+    }
+    catch (error) {
+        errorMessage.value = error.message;
+    }
+}
 // 当前在聊会话(群或好友)的展示标题
 const conversationTitle = computed(() => {
     if (conversationType.value === 'friend')
@@ -53,73 +89,28 @@ function groupMemberDisplayName(senderId) {
     const m = currentGroupDetail.value.members.find((mm) => mm.userId === senderId);
     return m ? m.nickname || m.username : String(senderId);
 }
-async function uploadOwnPublicKey(serializedPublicKey) {
-    await http.put('/users/me/public-key', {
-        publicKey: serializedPublicKey,
-        algorithm: E2EE_MESSAGE_ALGORITHM
-    });
-    authStore.user = authStore.user
-        ? {
-            ...authStore.user,
-            publicKey: serializedPublicKey,
-            publicKeyAlgorithm: E2EE_MESSAGE_ALGORITHM
-        }
-        : null;
+function buildRenderKey(message) {
+    if (message.id) {
+        return `${message.sourceType || 'friend'}-${message.id}`;
+    }
+    return [
+        message.sourceType || 'friend',
+        message.senderId,
+        message.receiverId ?? 'na',
+        message.groupId ?? 'na',
+        message.createdAt ?? 'na',
+        message.content
+    ].join('-');
 }
-async function exportPublicKeyFromPrivateKey(serializedPrivateKey) {
-    const importedPrivateKey = await importPrivateKey(serializedPrivateKey);
-    const jwk = await window.crypto.subtle.exportKey('jwk', importedPrivateKey);
-    const publicKey = await window.crypto.subtle.importKey('jwk', {
-        kty: jwk.kty,
-        n: jwk.n,
-        e: jwk.e,
-        alg: jwk.alg,
-        ext: true,
-        key_ops: ['encrypt']
-    }, { name: 'RSA-OAEP', hash: 'SHA-256' }, true, ['encrypt']);
-    return exportPublicKey(publicKey);
-}
-async function ensureOwnKeyPair() {
-    if (!authStore.user?.id)
-        return;
-    const storedPrivateKey = loadPrivateKey(authStore.user.id);
-    if (storedPrivateKey) {
-        privateKey.value = await importPrivateKey(storedPrivateKey);
-        if (authStore.user.publicKey && authStore.user.publicKeyAlgorithm === E2EE_MESSAGE_ALGORITHM) {
-            return;
-        }
-        const serializedPublicKey = await exportPublicKeyFromPrivateKey(storedPrivateKey);
-        await uploadOwnPublicKey(serializedPublicKey);
-        return;
-    }
-    const keyPair = await generateKeyPair();
-    const serializedPublicKey = await exportPublicKey(keyPair.publicKey);
-    const serializedPrivateKey = await exportPrivateKey(keyPair.privateKey);
-    savePrivateKey(authStore.user.id, serializedPrivateKey);
-    privateKey.value = keyPair.privateKey;
-    await uploadOwnPublicKey(serializedPublicKey);
-}
-async function toRenderMessage(message) {
-    const payload = selectMessagePayloadForUser(message, authStore.user?.id);
-    if (!privateKey.value) {
-        return {
-            ...message,
-            ...buildEncryptedMessageDisplay('', payload)
-        };
-    }
-    try {
-        const content = await decryptMessage(privateKey.value, payload.ciphertext);
-        return {
-            ...message,
-            ...buildEncryptedMessageDisplay(content, payload)
-        };
-    }
-    catch {
-        return {
-            ...message,
-            ...buildEncryptedMessageDisplay('', payload)
-        };
-    }
+function toRenderMessage(message) {
+    const renderMessage = {
+        ...message,
+        sourceType: 'friend'
+    };
+    return {
+        ...renderMessage,
+        renderKey: buildRenderKey(renderMessage)
+    };
 }
 async function loadFriends() {
     const { data } = await http.get('/friends');
@@ -134,35 +125,27 @@ async function loadFriendMessages() {
         messages.value = [];
         return;
     }
-    const { data } = await http.get(`/messages?friendId=${currentFriendId.value}`);
-    messages.value = await Promise.all(data.map(toRenderMessage));
+    const { data } = await http.get(`/normal-messages?friendId=${currentFriendId.value}`);
+    messages.value = data.map(toRenderMessage);
     await scrollToBottom();
 }
-async function toGroupRenderMessage(message) {
-    const base = {
-        id: message.id,
-        senderId: message.senderId,
-        groupId: message.groupId,
-        content: '***（已加密）',
-        createdAt: message.createdAt
+function toGroupRenderMessage(message) {
+    const renderMessage = {
+        ...message,
+        sourceType: 'group'
     };
-    if (!privateKey.value)
-        return base;
-    try {
-        base.content = await decryptGroupMessage(privateKey.value, message.keyCiphertext, message.contentCiphertext, message.contentIv);
-    }
-    catch {
-        // 保持加密占位
-    }
-    return base;
+    return {
+        ...renderMessage,
+        renderKey: buildRenderKey(renderMessage)
+    };
 }
 async function loadGroupMessages() {
     if (!currentGroupId.value) {
         messages.value = [];
         return;
     }
-    const { data } = await http.get(`/groups/${currentGroupId.value}/messages`);
-    messages.value = await Promise.all(data.map(toGroupRenderMessage));
+    const { data } = await http.get(`/groups/${currentGroupId.value}/normal-messages`);
+    messages.value = data.map(toGroupRenderMessage);
     await scrollToBottom();
 }
 async function loadGroupDetail(groupId) {
@@ -170,6 +153,7 @@ async function loadGroupDetail(groupId) {
     currentGroupDetail.value = data;
 }
 async function selectFriend(friendId) {
+    clearSelection();
     conversationType.value = 'friend';
     currentFriendId.value = friendId;
     currentGroupId.value = null;
@@ -177,6 +161,7 @@ async function selectFriend(friendId) {
     await loadFriendMessages();
 }
 async function selectGroup(groupId) {
+    clearSelection();
     conversationType.value = 'group';
     currentGroupId.value = groupId;
     currentFriendId.value = null;
@@ -189,7 +174,7 @@ async function selectGroup(groupId) {
     }
 }
 async function sendMessage() {
-    if (!draft.value.trim() || sending.value)
+    if (!canSendMessage.value || !draft.value.trim())
         return;
     errorMessage.value = '';
     if (conversationType.value === 'friend') {
@@ -202,34 +187,14 @@ async function sendMessage() {
 async function sendFriendMessage() {
     if (!currentFriendId.value)
         return;
-    if (!privateKey.value) {
-        errorMessage.value = '当前设备没有可用私钥';
-        return;
-    }
-    const friend = currentFriend.value;
-    if (!friend?.publicKey) {
-        errorMessage.value = '对方未启用端到端加密消息';
-        return;
-    }
-    if (!authStore.user?.publicKey) {
-        errorMessage.value = '当前账号公钥不可用';
-        return;
-    }
     sending.value = true;
     try {
-        const receiverPublicKey = await importPublicKey(friend.publicKey);
-        const senderPublicKey = await importPublicKey(authStore.user.publicKey);
         const content = draft.value.trim();
-        const receiverEncrypted = await encryptMessage(receiverPublicKey, content);
-        const senderEncrypted = await encryptMessage(senderPublicKey, content);
-        const { data } = await http.post('/messages', {
+        const { data } = await http.post('/normal-messages', {
             receiverId: currentFriendId.value,
-            senderCiphertext: senderEncrypted.ciphertext,
-            senderAlgorithm: senderEncrypted.algorithm,
-            receiverCiphertext: receiverEncrypted.ciphertext,
-            receiverAlgorithm: receiverEncrypted.algorithm
+            content
         });
-        messages.value.push(await toRenderMessage(data));
+        messages.value.push(toRenderMessage(data));
         draft.value = '';
         await scrollToBottom();
     }
@@ -243,31 +208,13 @@ async function sendFriendMessage() {
 async function sendGroupMessage() {
     if (!currentGroupId.value)
         return;
-    if (!privateKey.value) {
-        errorMessage.value = '当前设备没有可用私钥';
-        return;
-    }
-    // 发消息前刷新一次成员列表,避免缺漏新成员的密钥包裹
     sending.value = true;
     try {
-        await loadGroupDetail(currentGroupId.value);
-        const detail = currentGroupDetail.value;
-        if (!detail)
-            throw new Error('群信息加载失败');
-        const members = detail.members.map((m) => ({
-            userId: m.userId,
-            publicKey: m.publicKey || '',
-            publicKeyAlgorithm: m.publicKeyAlgorithm || ''
-        }));
         const content = draft.value.trim();
-        const envelope = await buildGroupMessageEnvelope(content, members);
-        const { data } = await http.post(`/groups/${currentGroupId.value}/messages`, {
-            contentCiphertext: envelope.contentCiphertext,
-            contentIv: envelope.contentIv,
-            contentAlgorithm: envelope.contentAlgorithm,
-            memberKeys: envelope.memberKeys
+        const { data } = await http.post(`/groups/${currentGroupId.value}/normal-messages`, {
+            content
         });
-        messages.value.push(await toGroupRenderMessage(data));
+        messages.value.push(toGroupRenderMessage(data));
         draft.value = '';
         await scrollToBottom();
     }
@@ -340,23 +287,22 @@ function connectSocket() {
     };
     socket.onmessage = async (event) => {
         const payload = JSON.parse(event.data);
-        if (payload.type === 'chat_message') {
+        if (payload.type === 'normal_chat_message') {
             const chatMessage = payload.data;
             if (conversationType.value === 'friend' &&
                 currentFriendId.value &&
                 (chatMessage.senderId === currentFriendId.value || chatMessage.receiverId === currentFriendId.value)) {
-                messages.value.push(await toRenderMessage(chatMessage));
+                messages.value.push(toRenderMessage(chatMessage));
                 await scrollToBottom();
             }
         }
-        else if (payload.type === 'group_message') {
+        else if (payload.type === 'normal_group_message') {
             const groupMessage = payload.data;
-            // 自己发的消息已经在 sendGroupMessage 里 push 过,避免重复
             if (groupMessage.senderId === authStore.user?.id)
                 return;
             if (conversationType.value === 'group' &&
                 currentGroupId.value === groupMessage.groupId) {
-                messages.value.push(await toGroupRenderMessage(groupMessage));
+                messages.value.push(toGroupRenderMessage(groupMessage));
                 await scrollToBottom();
             }
         }
@@ -371,7 +317,61 @@ async function scrollToBottom() {
 watch(messages, () => {
     scrollToBottom();
 }, { deep: true });
+function friendAvatarUrl(friend) {
+    return friend.avatar || '';
+}
+function messageKey(message) {
+    return message.renderKey;
+}
+function isSelected(message) {
+    return selectedMessageKeys.value.includes(messageKey(message));
+}
+function openAIChat() {
+    router.push('/ai-chat');
+}
+function openEncryptedChat() {
+    router.push('/encrypted-chat');
+}
+function openFavorites() {
+    router.push('/favorites');
+}
+function enterSelectionMode(message) {
+    selectionMode.value = true;
+    toggleSelection(message);
+}
+function toggleSelection(message) {
+    const key = messageKey(message);
+    if (selectedMessageKeys.value.includes(key)) {
+        selectedMessageKeys.value = selectedMessageKeys.value.filter((item) => item !== key);
+        if (selectedMessageKeys.value.length === 0) {
+            selectionMode.value = false;
+        }
+        return;
+    }
+    selectedMessageKeys.value = [...selectedMessageKeys.value, key];
+}
+async function favoriteSelectedMessages() {
+    if (selectedMessageKeys.value.length === 0)
+        return;
+    errorMessage.value = '';
+    const selected = messages.value.filter((message) => isSelected(message) && message.id && message.sourceType);
+    try {
+        await http.post('/favorites', {
+            items: selected.map((message) => ({ sourceType: message.sourceType, sourceMessageId: message.id, content: message.content }))
+        });
+        selectionMode.value = false;
+        selectedMessageKeys.value = [];
+    }
+    catch (error) {
+        errorMessage.value = error.message;
+    }
+}
+function clearSelection() {
+    selectionMode.value = false;
+    selectedMessageKeys.value = [];
+}
 function backToList() {
+    clearSelection();
     conversationType.value = null;
     currentFriendId.value = null;
     currentGroupId.value = null;
@@ -385,14 +385,6 @@ onMounted(async () => {
     catch (error) {
         errorMessage.value = error.message;
         return;
-    }
-    // 加密初始化失败不应阻断好友列表与历史消息的展示，因此独立 try
-    try {
-        await ensureOwnKeyPair();
-    }
-    catch (error) {
-        cryptoReady.value = false;
-        errorMessage.value = error.message;
     }
     try {
         await loadFriends();
@@ -413,6 +405,12 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['chat-theme-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar-banner']} */ ;
 /** @type {__VLS_StyleScopedClasses['signal-pill']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-entry-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-entry-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['encrypted-entry-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['encrypted-entry-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['favorite-entry-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['favorite-entry-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar-top']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-top']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar-top']} */ ;
@@ -431,6 +429,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['friend-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['friend-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['message-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['mine']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-item']} */ ;
@@ -513,6 +512,48 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements
     ...{ class: "muted" },
 });
 (__VLS_ctx.totalConversationCount);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.openAIChat) },
+    ...{ class: "ai-entry-card" },
+    type: "button",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "apple-label" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "ai-entry-arrow" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.openEncryptedChat) },
+    ...{ class: "encrypted-entry-card" },
+    type: "button",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "apple-label" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "encrypted-entry-arrow" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.openFavorites) },
+    ...{ class: "favorite-entry-card" },
+    type: "button",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+    ...{ class: "apple-label" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "favorite-entry-arrow" },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "sidebar-tabs" },
 });
@@ -549,10 +590,19 @@ if (__VLS_ctx.sidebarTab === 'friend') {
             ...{ class: "friend-item" },
             ...{ class: ({ active: __VLS_ctx.conversationType === 'friend' && __VLS_ctx.currentFriendId === friend.friendId }) },
         });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "friend-avatar" },
-        });
-        (friend.nickname.slice(0, 1).toUpperCase());
+        if (__VLS_ctx.friendAvatarUrl(friend)) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.img)({
+                src: (friend.avatar),
+                alt: "avatar",
+                ...{ class: "friend-avatar avatar-image" },
+            });
+        }
+        else {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "friend-avatar" },
+            });
+            (friend.nickname.slice(0, 1).toUpperCase());
+        }
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "friend-copy" },
         });
@@ -631,31 +681,36 @@ if (__VLS_ctx.authStore.user) {
     });
     (__VLS_ctx.authStore.user.nickname || __VLS_ctx.authStore.user.username);
 }
-if (__VLS_ctx.conversationType === 'group') {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (...[$event]) => {
-                if (!(__VLS_ctx.conversationType === 'group'))
-                    return;
-                __VLS_ctx.showGroupInfo = true;
-            } },
-        ...{ class: "apple-button secondary refresh-btn" },
-    });
-}
-else {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (__VLS_ctx.loadFriends) },
-        ...{ class: "apple-button secondary refresh-btn" },
-    });
-}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.handleHeaderAction) },
+    ...{ class: "apple-button secondary refresh-btn" },
+    type: "button",
+});
+(__VLS_ctx.headerActionLabel);
 if (__VLS_ctx.errorMessage) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
         ...{ class: "status-text error" },
     });
     (__VLS_ctx.errorMessage);
 }
-if (!__VLS_ctx.cryptoReady && !__VLS_ctx.errorMessage) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-        ...{ class: "status-text error" },
+if (__VLS_ctx.selectionMode) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "selection-toolbar" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    (__VLS_ctx.selectedMessageKeys.length);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "selection-actions" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.clearSelection) },
+        ...{ class: "apple-button secondary" },
+        type: "button",
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.favoriteSelectedMessages) },
+        ...{ class: "apple-button" },
+        type: "button",
     });
 }
 if (!__VLS_ctx.conversationType) {
@@ -674,14 +729,25 @@ else {
         ...{ class: "messages" },
     });
     /** @type {typeof __VLS_ctx.messageListRef} */ ;
-    for (const [message, index] of __VLS_getVForSourceType((__VLS_ctx.messages))) {
+    for (const [message] of __VLS_getVForSourceType((__VLS_ctx.messages))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            key: (index),
+            ...{ onContextmenu: (...[$event]) => {
+                    if (!!(!__VLS_ctx.conversationType))
+                        return;
+                    __VLS_ctx.enterSelectionMode(message);
+                } },
+            key: (message.renderKey),
             ...{ class: "message-row" },
             ...{ class: ({ mine: __VLS_ctx.isMine(message) }) },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ onClick: (...[$event]) => {
+                    if (!!(!__VLS_ctx.conversationType))
+                        return;
+                    __VLS_ctx.selectionMode ? __VLS_ctx.toggleSelection(message) : undefined;
+                } },
             ...{ class: "message-item" },
+            ...{ class: ({ selected: __VLS_ctx.isSelected(message) }) },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "message-meta" },
@@ -708,18 +774,18 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
-(__VLS_ctx.cryptoReady ? '已开启' : '不可用');
+(__VLS_ctx.composerStatusText);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     ...{ onKeyup: (__VLS_ctx.sendMessage) },
     ...{ class: "apple-input" },
-    disabled: (!__VLS_ctx.conversationType || __VLS_ctx.sending || !__VLS_ctx.cryptoReady),
-    placeholder: (__VLS_ctx.cryptoReady ? '输入消息，按回车发送' : '当前环境不支持发送加密消息'),
+    disabled: (!__VLS_ctx.canSendMessage),
+    placeholder: "输入消息，按回车发送",
 });
 (__VLS_ctx.draft);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.sendMessage) },
     ...{ class: "apple-button" },
-    disabled: (!__VLS_ctx.conversationType || __VLS_ctx.sending || !__VLS_ctx.cryptoReady),
+    disabled: (!__VLS_ctx.canSendMessage),
 });
 (__VLS_ctx.sending ? '发送中...' : '发送');
 /** @type {[typeof CreateGroupModal, ]} */ ;
@@ -728,13 +794,13 @@ const __VLS_3 = __VLS_asFunctionalComponent(CreateGroupModal, new CreateGroupMod
     ...{ 'onClose': {} },
     ...{ 'onSubmit': {} },
     visible: (__VLS_ctx.showCreateGroup),
-    friends: (__VLS_ctx.friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname, publicKey: f.publicKey }))),
+    friends: (__VLS_ctx.friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname }))),
 }));
 const __VLS_4 = __VLS_3({
     ...{ 'onClose': {} },
     ...{ 'onSubmit': {} },
     visible: (__VLS_ctx.showCreateGroup),
-    friends: (__VLS_ctx.friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname, publicKey: f.publicKey }))),
+    friends: (__VLS_ctx.friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname }))),
 }, ...__VLS_functionalComponentArgsRest(__VLS_3));
 let __VLS_6;
 let __VLS_7;
@@ -759,7 +825,7 @@ const __VLS_11 = __VLS_asFunctionalComponent(GroupInfoPanel, new GroupInfoPanel(
     ownerId: (__VLS_ctx.currentGroupDetail?.ownerId || 0),
     members: (__VLS_ctx.currentGroupDetail?.members || []),
     myUserId: (__VLS_ctx.authStore.user?.id ?? null),
-    friends: (__VLS_ctx.friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname, publicKey: f.publicKey }))),
+    friends: (__VLS_ctx.friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname }))),
 }));
 const __VLS_12 = __VLS_11({
     ...{ 'onClose': {} },
@@ -770,7 +836,7 @@ const __VLS_12 = __VLS_11({
     ownerId: (__VLS_ctx.currentGroupDetail?.ownerId || 0),
     members: (__VLS_ctx.currentGroupDetail?.members || []),
     myUserId: (__VLS_ctx.authStore.user?.id ?? null),
-    friends: (__VLS_ctx.friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname, publicKey: f.publicKey }))),
+    friends: (__VLS_ctx.friends.map((f) => ({ friendId: f.friendId, nickname: f.nickname }))),
 }, ...__VLS_functionalComponentArgsRest(__VLS_11));
 let __VLS_14;
 let __VLS_15;
@@ -800,11 +866,22 @@ var __VLS_13;
 /** @type {__VLS_StyleScopedClasses['sidebar-top']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-entry-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['ai-entry-arrow']} */ ;
+/** @type {__VLS_StyleScopedClasses['encrypted-entry-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['encrypted-entry-arrow']} */ ;
+/** @type {__VLS_StyleScopedClasses['favorite-entry-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['favorite-entry-arrow']} */ ;
 /** @type {__VLS_StyleScopedClasses['sidebar-tabs']} */ ;
 /** @type {__VLS_StyleScopedClasses['tab-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['tab-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
 /** @type {__VLS_StyleScopedClasses['friend-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['friend-avatar']} */ ;
+/** @type {__VLS_StyleScopedClasses['avatar-image']} */ ;
 /** @type {__VLS_StyleScopedClasses['friend-avatar']} */ ;
 /** @type {__VLS_StyleScopedClasses['friend-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
@@ -824,13 +901,13 @@ var __VLS_13;
 /** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
 /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
 /** @type {__VLS_StyleScopedClasses['refresh-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['status-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['error']} */ ;
+/** @type {__VLS_StyleScopedClasses['selection-toolbar']} */ ;
+/** @type {__VLS_StyleScopedClasses['selection-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
 /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
-/** @type {__VLS_StyleScopedClasses['refresh-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['status-text']} */ ;
-/** @type {__VLS_StyleScopedClasses['error']} */ ;
-/** @type {__VLS_StyleScopedClasses['status-text']} */ ;
-/** @type {__VLS_StyleScopedClasses['error']} */ ;
+/** @type {__VLS_StyleScopedClasses['apple-button']} */ ;
 /** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat-empty-state']} */ ;
 /** @type {__VLS_StyleScopedClasses['empty-illustration']} */ ;
@@ -862,18 +939,22 @@ const __VLS_self = (await import('vue')).defineComponent({
             sidebarTab: sidebarTab,
             draft: draft,
             errorMessage: errorMessage,
-            cryptoReady: cryptoReady,
             socketConnected: socketConnected,
             sending: sending,
             messageListRef: messageListRef,
             showCreateGroup: showCreateGroup,
             showGroupInfo: showGroupInfo,
+            selectionMode: selectionMode,
+            selectedMessageKeys: selectedMessageKeys,
             currentFriend: currentFriend,
             totalConversationCount: totalConversationCount,
             currentConversationHint: currentConversationHint,
+            canSendMessage: canSendMessage,
+            composerStatusText: composerStatusText,
+            headerActionLabel: headerActionLabel,
+            handleHeaderAction: handleHeaderAction,
             conversationTitle: conversationTitle,
             groupMemberDisplayName: groupMemberDisplayName,
-            loadFriends: loadFriends,
             selectFriend: selectFriend,
             selectGroup: selectGroup,
             sendMessage: sendMessage,
@@ -881,6 +962,15 @@ const __VLS_self = (await import('vue')).defineComponent({
             handleInviteMembers: handleInviteMembers,
             handleLeaveGroup: handleLeaveGroup,
             isMine: isMine,
+            friendAvatarUrl: friendAvatarUrl,
+            isSelected: isSelected,
+            openAIChat: openAIChat,
+            openEncryptedChat: openEncryptedChat,
+            openFavorites: openFavorites,
+            enterSelectionMode: enterSelectionMode,
+            toggleSelection: toggleSelection,
+            favoriteSelectedMessages: favoriteSelectedMessages,
+            clearSelection: clearSelection,
             backToList: backToList,
         };
     },

@@ -43,10 +43,15 @@ type RegisterInput struct {
 }
 
 type UpdateProfileInput struct {
-	Nickname     string
-	Gender       int
-	Signature    string
-	HomepageSkin string
+	Nickname           string
+	Gender             int
+	Signature          string
+	Avatar             string
+	HomepageSkin       string
+	AvatarAccessory    string
+	TitleBadge         string
+	HomepageBackground string
+	HomepageLayout     string
 }
 
 type UpdatePublicKeyInput struct {
@@ -55,11 +60,15 @@ type UpdatePublicKeyInput struct {
 }
 
 type PublicProfile struct {
-	ID           uint64 `json:"id"`
-	Nickname     string `json:"nickname"`
-	Avatar       string `json:"avatar"`
-	Signature    string `json:"signature"`
-	HomepageSkin string `json:"homepageSkin"`
+	ID                 uint64 `json:"id"`
+	Nickname           string `json:"nickname"`
+	Avatar             string `json:"avatar"`
+	Signature          string `json:"signature"`
+	HomepageSkin       string `json:"homepageSkin"`
+	AvatarAccessory    string `json:"avatarAccessory"`
+	TitleBadge         string `json:"titleBadge"`
+	HomepageBackground string `json:"homepageBackground"`
+	HomepageLayout     string `json:"homepageLayout"`
 }
 
 func (s *AuthService) Register(input RegisterInput) (*model.User, error) {
@@ -83,6 +92,10 @@ func (s *AuthService) Register(input RegisterInput) (*model.User, error) {
 		Gender:             0,
 		Signature:          "",
 		HomepageSkin:       defaultHomepageSkin,
+		AvatarAccessory:    "none",
+		TitleBadge:         "none",
+		HomepageBackground: "plain",
+		HomepageLayout:     "classic",
 		PublicKey:          "",
 		PublicKeyAlgorithm: "",
 	}
@@ -160,11 +173,15 @@ func (s *AuthService) GetVisibleProfile(viewerID uint64, targetUserID uint64, fr
 		return nil, err
 	}
 	return &PublicProfile{
-		ID:           user.ID,
-		Nickname:     user.Nickname,
-		Avatar:       user.Avatar,
-		Signature:    user.Signature,
-		HomepageSkin: user.HomepageSkin,
+		ID:                 user.ID,
+		Nickname:           user.Nickname,
+		Avatar:             user.Avatar,
+		Signature:          user.Signature,
+		HomepageSkin:       user.HomepageSkin,
+		AvatarAccessory:    user.AvatarAccessory,
+		TitleBadge:         user.TitleBadge,
+		HomepageBackground: user.HomepageBackground,
+		HomepageLayout:     user.HomepageLayout,
 	}, nil
 }
 
@@ -172,7 +189,7 @@ func (s *AuthService) UpdateProfile(userID uint64, input UpdateProfileInput) (*m
 	if !isAllowedHomepageSkin(input.HomepageSkin) {
 		return nil, ErrInvalidHomepageSkin
 	}
-	return s.repo.UpdateProfile(userID, input.Nickname, input.Gender, input.Signature, input.HomepageSkin)
+	return s.repo.UpdateProfile(userID, input.Nickname, input.Gender, input.Signature, input.Avatar, input.HomepageSkin, input.AvatarAccessory, input.TitleBadge, input.HomepageBackground, input.HomepageLayout)
 }
 
 func (s *AuthService) UpdatePublicKey(userID uint64, input UpdatePublicKeyInput) (*model.User, error) {

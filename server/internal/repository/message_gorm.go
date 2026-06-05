@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+
 	"whr-im/server/internal/model"
 
 	"gorm.io/gorm"
@@ -8,6 +10,7 @@ import (
 
 type MessageRepository interface {
 	Create(message *model.Message) error
+	FindByID(id uint64) (*model.Message, error)
 	ListConversation(userID uint64, friendID uint64) ([]model.Message, error)
 }
 
@@ -24,6 +27,17 @@ func NewGormMessageRepository(db *gorm.DB) (*GormMessageRepository, error) {
 
 func (r *GormMessageRepository) Create(message *model.Message) error {
 	return r.db.Create(message).Error
+}
+
+func (r *GormMessageRepository) FindByID(id uint64) (*model.Message, error) {
+	var message model.Message
+	if err := r.db.First(&message, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	return &message, nil
 }
 
 func (r *GormMessageRepository) ListConversation(userID uint64, friendID uint64) ([]model.Message, error) {

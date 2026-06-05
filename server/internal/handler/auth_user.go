@@ -32,10 +32,15 @@ type loginRequest struct {
 }
 
 type updateProfileRequest struct {
-	Nickname     string `json:"nickname"`
-	Gender       int    `json:"gender"`
-	Signature    string `json:"signature"`
-	HomepageSkin string `json:"homepageSkin"`
+	Nickname           string `json:"nickname"`
+	Gender             int    `json:"gender"`
+	Signature          string `json:"signature"`
+	Avatar             string `json:"avatar"`
+	HomepageSkin       string `json:"homepageSkin"`
+	AvatarAccessory    string `json:"avatarAccessory"`
+	TitleBadge         string `json:"titleBadge"`
+	HomepageBackground string `json:"homepageBackground"`
+	HomepageLayout     string `json:"homepageLayout"`
 }
 
 type updatePublicKeyRequest struct {
@@ -107,10 +112,15 @@ func (h *AuthUserHandler) UpdateMe(c *gin.Context) {
 
 	userID := c.MustGet("userID").(uint64)
 	user, err := h.authService.UpdateProfile(userID, service.UpdateProfileInput{
-		Nickname:     req.Nickname,
-		Gender:       req.Gender,
-		Signature:    req.Signature,
-		HomepageSkin: req.HomepageSkin,
+		Nickname:           req.Nickname,
+		Gender:             req.Gender,
+		Signature:          req.Signature,
+		Avatar:             req.Avatar,
+		HomepageSkin:       req.HomepageSkin,
+		AvatarAccessory:    req.AvatarAccessory,
+		TitleBadge:         req.TitleBadge,
+		HomepageBackground: req.HomepageBackground,
+		HomepageLayout:     req.HomepageLayout,
 	})
 	if err != nil {
 		status := http.StatusNotFound

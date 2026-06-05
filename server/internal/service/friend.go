@@ -9,6 +9,7 @@ import (
 )
 
 var ErrAlreadyFriends = errors.New("对方已经是你的好友")
+var ErrFriendRelationNotFound = errors.New("该用户不是你的好友")
 
 type FriendService struct {
 	friendRepo repository.FriendRepository
@@ -101,6 +102,17 @@ func (s *FriendService) AcceptRequest(requestID uint64, userID uint64) (*model.F
 
 func (s *FriendService) RejectRequest(requestID uint64, userID uint64) (*model.FriendRequest, error) {
 	return s.friendRepo.HandleRequest(requestID, userID, "rejected")
+}
+
+func (s *FriendService) DeleteFriend(userID uint64, friendID uint64) error {
+	alreadyFriends, err := s.friendRepo.AreFriends(userID, friendID)
+	if err != nil {
+		return err
+	}
+	if !alreadyFriends {
+		return ErrFriendRelationNotFound
+	}
+	return s.friendRepo.DeleteFriendPair(userID, friendID)
 }
 
 func (s *FriendService) ListFriends(userID uint64) ([]FriendListItem, error) {

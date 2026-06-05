@@ -3,9 +3,15 @@ package router
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"whr-im/server/internal/repository"
+
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // 验证:创建群时,如果传入的成员不是创建者好友,接口应当 400 拒绝。
@@ -169,5 +175,310 @@ func TestNonMemberCannotAccessGroupMessages(t *testing.T) {
 	r.ServeHTTP(listW, listReq)
 	if listW.Code != http.StatusBadRequest {
 		t.Fatalf("expected non-member list status 400, got %d with body %s", listW.Code, listW.Body.String())
+	}
+}
+
+func TestNormalGroupMessageSendAndHistoryFlow(t *testing.T) {
+	r := newTestRouter(t)
+
+	aliceToken, aliceID := registerAndLoginWithID(t, r, "alice")
+	bobToken, bobID := registerAndLoginWithID(t, r, "bobby")
+	makeFriends(t, r, aliceToken, bobToken)
+
+	createBody := []byte(fmt.Sprintf(`{"name":"普通群","memberIds":[%d]}`, bobID))
+	createReq := httptest.NewRequest(http.MethodPost, "/api/groups", bytes.NewReader(createBody))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("expected create group 201, got %d with body %s", createW.Code, createW.Body.String())
+	}
+
+	var createdGroup struct {
+		ID uint64 `json:"id"`
+	}
+	if err := json.Unmarshal(createW.Body.Bytes(), &createdGroup); err != nil {
+		t.Fatalf("expected create group json, got error: %v", err)
+	}
+	if createdGroup.ID == 0 {
+		t.Fatalf("expected non-zero group id, got %d", createdGroup.ID)
+	}
+
+	sendReq := httptest.NewRequest(http.MethodPost, "/api/groups/"+uint64Param(createdGroup.ID)+"/normal-messages", bytes.NewReader([]byte(`{"content":"hello group"}`)))
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	sendW := httptest.NewRecorder()
+	r.ServeHTTP(sendW, sendReq)
+	if sendW.Code != http.StatusCreated {
+		t.Fatalf("expected normal group message create status 201, got %d with body %s", sendW.Code, sendW.Body.String())
+	}
+
+	historyReq := httptest.NewRequest(http.MethodGet, "/api/groups/"+uint64Param(createdGroup.ID)+"/normal-messages", nil)
+	historyReq.Header.Set("Authorization", "Bearer "+bobToken)
+	historyW := httptest.NewRecorder()
+	r.ServeHTTP(historyW, historyReq)
+	if historyW.Code != http.StatusOK {
+		t.Fatalf("expected normal group history status 200, got %d with body %s", historyW.Code, historyW.Body.String())
+	}
+
+	var historyResp []struct {
+		SenderID  uint64 `json:"senderId"`
+		GroupID   uint64 `json:"groupId"`
+		Content   string `json:"content"`
+		CreatedAt string `json:"createdAt"`
+	}
+	if err := json.Unmarshal(historyW.Body.Bytes(), &historyResp); err != nil {
+		t.Fatalf("expected valid normal group history json, got error: %v", err)
+	}
+	if len(historyResp) != 1 {
+		t.Fatalf("expected 1 normal group message, got %d", len(historyResp))
+	}
+	if historyResp[0].SenderID != aliceID || historyResp[0].GroupID != createdGroup.ID {
+		t.Fatalf("expected normal group message from sender %d in group %d, got %#v", aliceID, createdGroup.ID, historyResp[0])
+	}
+	if historyResp[0].Content != "hello group" {
+		t.Fatalf("expected plaintext content in normal group history response, got %#v", historyResp[0])
+	}
+	if historyResp[0].CreatedAt == "" {
+		t.Fatalf("expected non-empty createdAt, got %#v", historyResp[0])
+	}
+
+	encryptedHistoryReq := httptest.NewRequest(http.MethodGet, "/api/groups/"+uint64Param(createdGroup.ID)+"/messages", nil)
+	encryptedHistoryReq.Header.Set("Authorization", "Bearer "+bobToken)
+	encryptedHistoryW := httptest.NewRecorder()
+	r.ServeHTTP(encryptedHistoryW, encryptedHistoryReq)
+	if encryptedHistoryW.Code != http.StatusOK {
+		t.Fatalf("expected encrypted group history status 200, got %d with body %s", encryptedHistoryW.Code, encryptedHistoryW.Body.String())
+	}
+
+	var encryptedHistoryResp []struct {
+		SenderID          uint64 `json:"senderId"`
+		GroupID           uint64 `json:"groupId"`
+		ContentCiphertext string `json:"contentCiphertext"`
+		CreatedAt         string `json:"createdAt"`
+	}
+	if err := json.Unmarshal(encryptedHistoryW.Body.Bytes(), &encryptedHistoryResp); err != nil {
+		t.Fatalf("expected valid encrypted group history json, got error: %v", err)
+	}
+	if len(encryptedHistoryResp) != 0 {
+		t.Fatalf("expected encrypted group history to stay isolated from normal group messages, got %#v", encryptedHistoryResp)
+	}
+}
+
+func TestNormalGroupMessageRejectsWhitespaceOnlyContent(t *testing.T) {
+	r := newTestRouter(t)
+
+	aliceToken, _ := registerAndLoginWithID(t, r, "alice")
+	bobToken, bobID := registerAndLoginWithID(t, r, "bobby")
+	makeFriends(t, r, aliceToken, bobToken)
+
+	createBody := []byte(fmt.Sprintf(`{"name":"普通群","memberIds":[%d]}`, bobID))
+	createReq := httptest.NewRequest(http.MethodPost, "/api/groups", bytes.NewReader(createBody))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("expected create group 201, got %d with body %s", createW.Code, createW.Body.String())
+	}
+
+	var createdGroup struct {
+		ID uint64 `json:"id"`
+	}
+	if err := json.Unmarshal(createW.Body.Bytes(), &createdGroup); err != nil {
+		t.Fatalf("expected create group json, got error: %v", err)
+	}
+
+	sendReq := httptest.NewRequest(http.MethodPost, "/api/groups/"+uint64Param(createdGroup.ID)+"/normal-messages", bytes.NewReader([]byte(`{"content":"   \n\t  "}`)))
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	sendW := httptest.NewRecorder()
+	r.ServeHTTP(sendW, sendReq)
+	if sendW.Code != http.StatusBadRequest {
+		t.Fatalf("expected whitespace-only normal group message status 400, got %d with body %s", sendW.Code, sendW.Body.String())
+	}
+	if !bytes.Contains(sendW.Body.Bytes(), []byte("content is required")) {
+		t.Fatalf("expected content required error, got body %s", sendW.Body.String())
+	}
+}
+
+func TestNormalGroupMessageHistoryReturnsAscendingOrder(t *testing.T) {
+	r := newTestRouter(t)
+
+	aliceToken, aliceID := registerAndLoginWithID(t, r, "alice")
+	bobToken, bobID := registerAndLoginWithID(t, r, "bobby")
+	makeFriends(t, r, aliceToken, bobToken)
+
+	createBody := []byte(fmt.Sprintf(`{"name":"普通群","memberIds":[%d]}`, bobID))
+	createReq := httptest.NewRequest(http.MethodPost, "/api/groups", bytes.NewReader(createBody))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("expected create group 201, got %d with body %s", createW.Code, createW.Body.String())
+	}
+
+	var createdGroup struct {
+		ID uint64 `json:"id"`
+	}
+	if err := json.Unmarshal(createW.Body.Bytes(), &createdGroup); err != nil {
+		t.Fatalf("expected create group json, got error: %v", err)
+	}
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/api/groups/"+uint64Param(createdGroup.ID)+"/normal-messages", bytes.NewReader([]byte(`{"content":"first message"}`)))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	firstW := httptest.NewRecorder()
+	r.ServeHTTP(firstW, firstReq)
+	if firstW.Code != http.StatusCreated {
+		t.Fatalf("expected first normal group message create status 201, got %d with body %s", firstW.Code, firstW.Body.String())
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/api/groups/"+uint64Param(createdGroup.ID)+"/normal-messages", bytes.NewReader([]byte(`{"content":"second message"}`)))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+bobToken)
+	secondW := httptest.NewRecorder()
+	r.ServeHTTP(secondW, secondReq)
+	if secondW.Code != http.StatusCreated {
+		t.Fatalf("expected second normal group message create status 201, got %d with body %s", secondW.Code, secondW.Body.String())
+	}
+
+	historyReq := httptest.NewRequest(http.MethodGet, "/api/groups/"+uint64Param(createdGroup.ID)+"/normal-messages", nil)
+	historyReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	historyW := httptest.NewRecorder()
+	r.ServeHTTP(historyW, historyReq)
+	if historyW.Code != http.StatusOK {
+		t.Fatalf("expected normal group history status 200, got %d with body %s", historyW.Code, historyW.Body.String())
+	}
+
+	var historyResp []struct {
+		SenderID uint64 `json:"senderId"`
+		Content  string `json:"content"`
+	}
+	if err := json.Unmarshal(historyW.Body.Bytes(), &historyResp); err != nil {
+		t.Fatalf("expected valid normal group history json, got error: %v", err)
+	}
+	if len(historyResp) != 2 {
+		t.Fatalf("expected 2 normal group messages, got %d", len(historyResp))
+	}
+	if historyResp[0].SenderID != aliceID || historyResp[0].Content != "first message" {
+		t.Fatalf("expected first history item to be alice's first message, got %#v", historyResp[0])
+	}
+	if historyResp[1].SenderID != bobID || historyResp[1].Content != "second message" {
+		t.Fatalf("expected second history item to be bob's second message, got %#v", historyResp[1])
+	}
+}
+
+func TestNormalGroupMessageRejectsNonMember(t *testing.T) {
+	r := newTestRouter(t)
+
+	aliceToken, _ := registerAndLoginWithID(t, r, "alice")
+	bobToken, bobID := registerAndLoginWithID(t, r, "bobby")
+	makeFriends(t, r, aliceToken, bobToken)
+	carolToken, _ := registerAndLoginWithID(t, r, "carol")
+
+	createBody := []byte(fmt.Sprintf(`{"name":"普通群","memberIds":[%d]}`, bobID))
+	createReq := httptest.NewRequest(http.MethodPost, "/api/groups", bytes.NewReader(createBody))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("expected create group 201, got %d with body %s", createW.Code, createW.Body.String())
+	}
+
+	var createdGroup struct {
+		ID uint64 `json:"id"`
+	}
+	if err := json.Unmarshal(createW.Body.Bytes(), &createdGroup); err != nil {
+		t.Fatalf("expected create group json, got error: %v", err)
+	}
+	if createdGroup.ID == 0 {
+		t.Fatalf("expected non-zero group id, got %d", createdGroup.ID)
+	}
+
+	sendReq := httptest.NewRequest(http.MethodPost, "/api/groups/"+uint64Param(createdGroup.ID)+"/normal-messages", bytes.NewReader([]byte(`{"content":"intrude"}`)))
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendReq.Header.Set("Authorization", "Bearer "+carolToken)
+	sendW := httptest.NewRecorder()
+	r.ServeHTTP(sendW, sendReq)
+	if sendW.Code != http.StatusForbidden {
+		t.Fatalf("expected non-member normal group message status 403, got %d with body %s", sendW.Code, sendW.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/groups/"+uint64Param(createdGroup.ID)+"/normal-messages", nil)
+	listReq.Header.Set("Authorization", "Bearer "+carolToken)
+	listW := httptest.NewRecorder()
+	r.ServeHTTP(listW, listReq)
+	if listW.Code != http.StatusForbidden {
+		t.Fatalf("expected non-member normal group history status 403, got %d with body %s", listW.Code, listW.Body.String())
+	}
+}
+
+func TestNormalGroupRoutesDoNotDependOnEncryptedGroupMessageRepo(t *testing.T) {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to open sqlite test database: %v", err)
+	}
+
+	userRepo, err := repository.NewGormUserRepository(db)
+	if err != nil {
+		t.Fatalf("failed to create gorm user repository: %v", err)
+	}
+	friendRepo, err := repository.NewGormFriendRepository(db)
+	if err != nil {
+		t.Fatalf("failed to create gorm friend repository: %v", err)
+	}
+	groupRepo, err := repository.NewGormGroupRepository(db)
+	if err != nil {
+		t.Fatalf("failed to create gorm group repository: %v", err)
+	}
+	normalGroupMessageRepo, err := repository.NewGormNormalGroupMessageRepository(db)
+	if err != nil {
+		t.Fatalf("failed to create gorm normal group message repository: %v", err)
+	}
+
+	r := NewWithRepositories(userRepo, friendRepo, nil, nil, groupRepo, nil, normalGroupMessageRepo, nil, nil, nil)
+
+	aliceToken, _ := registerAndLoginWithID(t, r, "alice")
+	bobToken, bobID := registerAndLoginWithID(t, r, "bobby")
+	makeFriends(t, r, aliceToken, bobToken)
+
+	createBody := []byte(fmt.Sprintf(`{"name":"普通群","memberIds":[%d]}`, bobID))
+	createReq := httptest.NewRequest(http.MethodPost, "/api/groups", bytes.NewReader(createBody))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	createW := httptest.NewRecorder()
+	r.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("expected create group 201, got %d with body %s", createW.Code, createW.Body.String())
+	}
+
+	var createdGroup struct {
+		ID uint64 `json:"id"`
+	}
+	if err := json.Unmarshal(createW.Body.Bytes(), &createdGroup); err != nil {
+		t.Fatalf("expected create group json, got error: %v", err)
+	}
+
+	sendReq := httptest.NewRequest(http.MethodPost, "/api/groups/"+uint64Param(createdGroup.ID)+"/normal-messages", bytes.NewReader([]byte(`{"content":"hello without encrypted repo"}`)))
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	sendW := httptest.NewRecorder()
+	r.ServeHTTP(sendW, sendReq)
+	if sendW.Code != http.StatusCreated {
+		t.Fatalf("expected normal group message create status 201 without encrypted repo, got %d with body %s", sendW.Code, sendW.Body.String())
+	}
+
+	historyReq := httptest.NewRequest(http.MethodGet, "/api/groups/"+uint64Param(createdGroup.ID)+"/normal-messages", nil)
+	historyReq.Header.Set("Authorization", "Bearer "+bobToken)
+	historyW := httptest.NewRecorder()
+	r.ServeHTTP(historyW, historyReq)
+	if historyW.Code != http.StatusOK {
+		t.Fatalf("expected normal group history status 200 without encrypted repo, got %d with body %s", historyW.Code, historyW.Body.String())
 	}
 }

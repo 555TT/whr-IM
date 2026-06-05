@@ -10,6 +10,10 @@ export interface CurrentUser {
   gender?: number
   signature?: string
   homepageSkin?: string
+  avatarAccessory?: string
+  titleBadge?: string
+  homepageBackground?: string
+  homepageLayout?: string
   publicKey?: string
   publicKeyAlgorithm?: string
 }

@@ -25,6 +25,7 @@ type GroupMessageForUser struct {
 
 type GroupMessageRepository interface {
 	Create(message *model.GroupMessage, keys []model.GroupMessageKey) error
+	FindByID(id uint64) (*model.GroupMessage, error)
 	ListForUser(groupID, userID uint64) ([]GroupMessageForUser, error)
 	GetKeyForUser(messageID, userID uint64) (*model.GroupMessageKey, error)
 }
@@ -53,6 +54,17 @@ func (r *GormGroupMessageRepository) Create(message *model.GroupMessage, keys []
 		}
 		return nil
 	})
+}
+
+func (r *GormGroupMessageRepository) FindByID(id uint64) (*model.GroupMessage, error) {
+	var message model.GroupMessage
+	if err := r.db.First(&message, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	return &message, nil
 }
 
 func (r *GormGroupMessageRepository) ListForUser(groupID, userID uint64) ([]GroupMessageForUser, error) {

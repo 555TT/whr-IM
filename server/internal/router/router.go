@@ -38,6 +38,10 @@ func New(cfg *config.Config) *gin.Engine {
 	if err != nil {
 		log.Fatal(err)
 	}
+	normalMessageRepo, err := repository.NewGormNormalMessageRepository(db)
+	if err != nil {
+		log.Fatal(err)
+	}
 	groupRepo, err := repository.NewGormGroupRepository(db)
 	if err != nil {
 		log.Fatal(err)
@@ -46,7 +50,19 @@ func New(cfg *config.Config) *gin.Engine {
 	if err != nil {
 		log.Fatal(err)
 	}
+	normalGroupMessageRepo, err := repository.NewGormNormalGroupMessageRepository(db)
+	if err != nil {
+		log.Fatal(err)
+	}
 	momentRepo, err := repository.NewGormMomentRepository(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+	aiChatRepo, err := repository.NewGormAIChatMessageRepository(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+	favoriteRepo, err := repository.NewGormFavoriteRepository(db)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -55,8 +71,9 @@ func New(cfg *config.Config) *gin.Engine {
 		log.Fatal(err)
 	}
 	momentAIProvider := service.NewDeepSeekMomentAIAssistProvider(cfg.AI)
+	aiChatProvider := service.NewDeepSeekAIChatProvider(cfg.AI)
 
-	return newEngine(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo, momentRepo, storage, momentAIProvider)
+	return newEngine(userRepo, friendRepo, messageRepo, normalMessageRepo, groupRepo, groupMessageRepo, normalGroupMessageRepo, momentRepo, aiChatRepo, favoriteRepo, storage, momentAIProvider, aiChatProvider)
 }
 
 func NewWithUserRepository(userRepo repository.UserRepository) *gin.Engine {
@@ -64,33 +81,42 @@ func NewWithUserRepository(userRepo repository.UserRepository) *gin.Engine {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return newEngine(userRepo, nil, nil, nil, nil, nil, storage, nil)
+	return newEngine(userRepo, nil, nil, nil, nil, nil, nil, nil, nil, nil, storage, nil, nil)
 }
 
 func NewWithRepositories(
 	userRepo repository.UserRepository,
 	friendRepo repository.FriendRepository,
 	messageRepo repository.MessageRepository,
+	normalMessageRepo repository.NormalMessageRepository,
 	groupRepo repository.GroupRepository,
 	groupMessageRepo repository.GroupMessageRepository,
+	normalGroupMessageRepo repository.NormalGroupMessageRepository,
 	momentRepo repository.MomentRepository,
+	aiChatRepo repository.AIChatMessageRepository,
+	favoriteRepo repository.FavoriteRepository,
 ) *gin.Engine {
 	storage, err := service.NewObjectStorageFromConfig(config.ObjectStorageConfig{PublicBaseURL: "http://localhost:9000"})
 	if err != nil {
 		log.Fatal(err)
 	}
-	return newEngine(userRepo, friendRepo, messageRepo, groupRepo, groupMessageRepo, momentRepo, storage, nil)
+	return newEngine(userRepo, friendRepo, messageRepo, normalMessageRepo, groupRepo, groupMessageRepo, normalGroupMessageRepo, momentRepo, aiChatRepo, favoriteRepo, storage, nil, nil)
 }
 
 func newEngine(
 	userRepo repository.UserRepository,
 	friendRepo repository.FriendRepository,
 	messageRepo repository.MessageRepository,
+	normalMessageRepo repository.NormalMessageRepository,
 	groupRepo repository.GroupRepository,
 	groupMessageRepo repository.GroupMessageRepository,
+	normalGroupMessageRepo repository.NormalGroupMessageRepository,
 	momentRepo repository.MomentRepository,
+	aiChatRepo repository.AIChatMessageRepository,
+	favoriteRepo repository.FavoriteRepository,
 	storage service.ObjectStorage,
 	momentAIProvider service.MomentAIAssistProvider,
+	aiChatProvider service.AIChatProvider,
 ) *gin.Engine {
 	r := gin.Default()
 	r.Use(middleware.CORS())
@@ -139,6 +165,8 @@ func newEngine(
 		authed.PUT("/friend-requests/:id/reject", friendHandler.RejectRequest)
 		// GET /api/friends: 获取当前用户的好友列表。
 		authed.GET("/friends", friendHandler.ListFriends)
+		// DELETE /api/friends/:id: 删除当前用户与指定好友的双向好友关系。
+		authed.DELETE("/friends/:id", friendHandler.DeleteFriend)
 
 		if messageRepo != nil {
 			messageService := service.NewMessageService(messageRepo, friendRepo, hub)
@@ -149,11 +177,38 @@ func newEngine(
 			authed.GET("/messages", messageHandler.List)
 		}
 
-		if groupRepo != nil && groupMessageRepo != nil {
+		if normalMessageRepo != nil {
+			normalMessageService := service.NewNormalMessageService(normalMessageRepo, friendRepo, hub)
+			normalMessageHandler := handler.NewNormalMessageHandler(normalMessageService)
+			// POST /api/normal-messages: 发送明文单聊消息，保存消息并实时推送给接收方。
+			authed.POST("/normal-messages", normalMessageHandler.Create)
+			// GET /api/normal-messages: 拉取当前用户与指定好友之间的明文单聊历史消息。
+			authed.GET("/normal-messages", normalMessageHandler.List)
+		}
+
+		if aiChatRepo != nil {
+			aiChatService := service.NewAIChatService(aiChatRepo, aiChatProvider)
+			aiChatHandler := handler.NewAIChatHandler(aiChatService)
+			// GET /api/ai-chat/messages: 获取当前用户与 AI 助手的历史消息。
+			authed.GET("/ai-chat/messages", aiChatHandler.ListMessages)
+			// POST /api/ai-chat/messages: 发送消息给 AI 助手，并返回本轮问答结果。
+			authed.POST("/ai-chat/messages", aiChatHandler.CreateMessage)
+		}
+
+		if favoriteRepo != nil && messageRepo != nil && groupRepo != nil && groupMessageRepo != nil && aiChatRepo != nil {
+			favoriteService := service.NewFavoriteService(favoriteRepo, messageRepo, groupMessageRepo, groupRepo, aiChatRepo, userRepo)
+			favoriteHandler := handler.NewFavoriteHandler(favoriteService)
+			// POST /api/favorites: 收藏一条或多条聊天消息。
+			authed.POST("/favorites", favoriteHandler.Create)
+			// GET /api/favorites: 获取当前用户的收藏列表。
+			authed.GET("/favorites", favoriteHandler.List)
+			// DELETE /api/favorites/:id: 取消当前用户的一条收藏。
+			authed.DELETE("/favorites/:id", favoriteHandler.Delete)
+		}
+
+		if groupRepo != nil {
 			groupService := service.NewGroupService(groupRepo, friendRepo, userRepo)
-			groupMessageService := service.NewGroupMessageService(groupMessageRepo, groupRepo, hub)
 			groupHandler := handler.NewGroupHandler(groupService)
-			groupMessageHandler := handler.NewGroupMessageHandler(groupMessageService)
 
 			groups := authed.Group("/groups")
 			// POST /api/groups: 创建群聊，并把创建者与指定好友加入群组。
@@ -166,10 +221,22 @@ func newEngine(
 			groups.POST("/:id/members", groupHandler.AddMembers)
 			// DELETE /api/groups/:id/members/me: 当前用户退出指定群聊。
 			groups.DELETE("/:id/members/me", groupHandler.LeaveGroup)
-			// POST /api/groups/:id/messages: 发送群聊消息，保存后实时广播给群成员。
-			groups.POST("/:id/messages", groupMessageHandler.Create)
-			// GET /api/groups/:id/messages: 获取指定群聊的历史消息列表。
-			groups.GET("/:id/messages", groupMessageHandler.List)
+			if groupMessageRepo != nil {
+				groupMessageService := service.NewGroupMessageService(groupMessageRepo, groupRepo, hub)
+				groupMessageHandler := handler.NewGroupMessageHandler(groupMessageService)
+				// POST /api/groups/:id/messages: 发送群聊消息，保存后实时广播给群成员。
+				groups.POST("/:id/messages", groupMessageHandler.Create)
+				// GET /api/groups/:id/messages: 获取指定群聊的历史消息列表。
+				groups.GET("/:id/messages", groupMessageHandler.List)
+			}
+			if normalGroupMessageRepo != nil {
+				normalGroupMessageService := service.NewNormalGroupMessageService(normalGroupMessageRepo, groupRepo, hub)
+				normalGroupMessageHandler := handler.NewNormalGroupMessageHandler(normalGroupMessageService)
+				// POST /api/groups/:id/normal-messages: 发送明文群聊消息，保存后实时广播给群成员。
+				groups.POST("/:id/normal-messages", normalGroupMessageHandler.Create)
+				// GET /api/groups/:id/normal-messages: 获取指定群聊的明文历史消息列表。
+				groups.GET("/:id/normal-messages", normalGroupMessageHandler.List)
+			}
 		}
 
 		if momentRepo != nil {

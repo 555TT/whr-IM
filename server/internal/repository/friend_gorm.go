@@ -13,6 +13,7 @@ type FriendRepository interface {
 	ListIncomingRequests(userID uint64) ([]model.FriendRequest, error)
 	HandleRequest(requestID uint64, userID uint64, status string) (*model.FriendRequest, error)
 	CreateFriendPair(userID uint64, friendID uint64) error
+	DeleteFriendPair(userID uint64, friendID uint64) error
 	ListFriends(userID uint64) ([]model.Friend, error)
 	AreFriends(userID uint64, friendID uint64) (bool, error)
 }
@@ -62,6 +63,15 @@ func (r *GormFriendRepository) CreateFriendPair(userID uint64, friendID uint64) 
 			if err := tx.Create(&friend).Error; err != nil {
 				return err
 			}
+		}
+		return nil
+	})
+}
+
+func (r *GormFriendRepository) DeleteFriendPair(userID uint64, friendID uint64) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("(user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)", userID, friendID, friendID, userID).Delete(&model.Friend{}).Error; err != nil {
+			return err
 		}
 		return nil
 	})

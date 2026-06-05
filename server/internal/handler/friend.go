@@ -74,6 +74,23 @@ func (h *FriendHandler) RejectRequest(c *gin.Context) {
 	c.JSON(http.StatusOK, request)
 }
 
+func (h *FriendHandler) DeleteFriend(c *gin.Context) {
+	friendID, err := strconv.ParseUint(strings.TrimSpace(c.Param("id")), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid friend id"})
+		return
+	}
+	if err := h.friendService.DeleteFriend(c.MustGet("userID").(uint64), friendID); err != nil {
+		status := http.StatusBadRequest
+		if err == service.ErrFriendRelationNotFound {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, gin.H{"message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "好友已删除"})
+}
+
 func (h *FriendHandler) ListFriends(c *gin.Context) {
 	friends, err := h.friendService.ListFriends(c.MustGet("userID").(uint64))
 	if err != nil {

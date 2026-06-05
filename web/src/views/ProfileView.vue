@@ -1,28 +1,70 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 
 import AppNav from '../components/AppNav.vue'
+import AvatarCropper from '../components/AvatarCropper.vue'
 import { http } from '../api/http'
-import { homepageSkins, resolveHomepageSkin } from '../constants/homepageSkins'
+import { resolveHomepageSkin } from '../constants/homepageSkins'
 import { useAuthStore } from '../stores/auth'
 import { genderCodeToLabel, genderLabelToCode } from '../utils/gender'
+
+interface UploadResponse {
+  objectKey: string
+  url: string
+}
+
+const maxAvatarSize = 2 * 1024 * 1024
 
 const authStore = useAuthStore()
 const loading = ref(false)
 const message = ref('')
 const errorMessage = ref('')
+const avatarPreviewUrl = ref('')
+const avatarFile = ref<File | null>(null)
+const cropperVisible = ref(false)
+const cropperImageUrl = ref('')
 const profile = reactive({
   nickname: '',
   gender: '女',
-  signature: '',
-  homepageSkin: 'aurora'
+  signature: ''
 })
+
+const displayAvatar = computed(() => avatarPreviewUrl.value || authStore.user?.avatar || '')
 
 function syncProfile() {
   profile.nickname = authStore.user?.nickname || ''
   profile.gender = genderCodeToLabel(authStore.user?.gender ?? 0)
   profile.signature = authStore.user?.signature || ''
-  profile.homepageSkin = authStore.user?.homepageSkin || 'aurora'
+  avatarPreviewUrl.value = ''
+  avatarFile.value = null
+}
+
+function pickAvatar(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  errorMessage.value = ''
+  message.value = ''
+  if (!file.type.startsWith('image/')) {
+    errorMessage.value = '请选择图片文件'
+    input.value = ''
+    return
+  }
+  if (file.size > maxAvatarSize) {
+    errorMessage.value = '头像图片不能超过 2MB'
+    input.value = ''
+    return
+  }
+  cropperImageUrl.value = URL.createObjectURL(file)
+  cropperVisible.value = true
+  input.value = ''
+}
+
+function applyCroppedAvatar(payload: { file: File; previewUrl: string }) {
+  avatarFile.value = payload.file
+  avatarPreviewUrl.value = payload.previewUrl
+  cropperVisible.value = false
+  cropperImageUrl.value = ''
 }
 
 async function saveProfile() {
@@ -30,11 +72,23 @@ async function saveProfile() {
   message.value = ''
   errorMessage.value = ''
   try {
+    let avatar = authStore.user?.avatar || ''
+    if (avatarFile.value) {
+      const formData = new FormData()
+      formData.append('file', avatarFile.value)
+      const { data: uploadData } = await http.post<UploadResponse>('/uploads/images', formData)
+      avatar = uploadData.url
+    }
     const { data } = await http.put('/users/me', {
       nickname: profile.nickname,
       gender: genderLabelToCode(profile.gender),
       signature: profile.signature,
-      homepageSkin: profile.homepageSkin
+      avatar,
+      homepageSkin: authStore.user?.homepageSkin || 'aurora',
+      avatarAccessory: authStore.user?.avatarAccessory || 'none',
+      titleBadge: authStore.user?.titleBadge || 'none',
+      homepageBackground: authStore.user?.homepageBackground || 'plain',
+      homepageLayout: authStore.user?.homepageLayout || 'classic'
     })
     authStore.user = data
     syncProfile()
@@ -47,7 +101,7 @@ async function saveProfile() {
 }
 
 function currentSkin() {
-  return resolveHomepageSkin(profile.homepageSkin)
+  return resolveHomepageSkin(authStore.user?.homepageSkin)
 }
 
 onMounted(syncProfile)
@@ -58,10 +112,17 @@ onMounted(syncProfile)
     <AppNav />
     <section class="card apple-panel profile-shell" :class="currentSkin().surfaceClass">
       <div class="profile-header profile-hero">
-        <div>
-          <p class="apple-label">Profile</p>
-          <h1>个人资料</h1>
-          <p class="muted">头像为系统默认头像，不可修改。你可以调整昵称、性别和个性签名。</p>
+        <div class="profile-header-main">
+          <label class="avatar-picker" :class="currentSkin().accentClass">
+            <input class="avatar-input" type="file" accept="image/*" @change="pickAvatar" />
+            <img v-if="displayAvatar" :src="displayAvatar" alt="avatar" class="profile-avatar" />
+            <div class="avatar-overlay">点击更换头像</div>
+          </label>
+          <div>
+            <p class="apple-label">Profile</p>
+            <h1>个人资料</h1>
+            <p class="muted">这里只保留基础资料编辑：昵称、性别、个性签名和头像。个性装扮请前往独立装扮中心。</p>
+          </div>
         </div>
       </div>
       <p v-if="message" class="status-text success">{{ message }}</p>
@@ -83,25 +144,11 @@ onMounted(syncProfile)
         <span class="apple-label">个性签名</span>
         <textarea v-model="profile.signature" class="apple-textarea" placeholder="写一句介绍自己的话" />
       </label>
-      <div>
-        <span class="apple-label">主页皮肤</span>
-        <div class="skin-grid">
-          <button
-            v-for="skin in homepageSkins"
-            :key="skin.key"
-            type="button"
-            class="skin-card"
-            :class="[skin.previewClass, { active: profile.homepageSkin === skin.key }]"
-            @click="profile.homepageSkin = skin.key"
-          >
-            <span class="skin-name">{{ skin.label }}</span>
-          </button>
-        </div>
-      </div>
       <div class="profile-actions">
         <button class="apple-button" :disabled="loading" @click="saveProfile">保存更改</button>
       </div>
     </section>
+    <AvatarCropper :visible="cropperVisible" :image-url="cropperImageUrl" @close="cropperVisible = false" @confirm="applyCroppedAvatar" />
   </div>
 </template>
 
@@ -143,6 +190,47 @@ label {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.profile-header-main {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.avatar-picker {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 32px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.18);
+}
+
+.avatar-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar-overlay {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 12px 10px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.72));
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
 }
 
 .skin-grid {
@@ -199,6 +287,11 @@ label {
 }
 
 @media (max-width: 760px) {
+  .profile-header-main {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .profile-grid {
     grid-template-columns: 1fr;
   }

@@ -52,19 +52,21 @@ func (r *GormUserRepository) FindByID(id uint64) (*model.User, error) {
 	return &user, nil
 }
 
-func (r *GormUserRepository) UpdateProfile(userID uint64, nickname string, gender int, signature string, homepageSkin string) (*model.User, error) {
+func (r *GormUserRepository) UpdateProfile(userID uint64, nickname string, gender int, signature string, avatar string, homepageSkin string, avatarAccessory string, titleBadge string, homepageBackground string, homepageLayout string) (*model.User, error) {
 	updates := map[string]interface{}{
-		"nickname":      nickname,
-		"gender":        gender,
-		"signature":     signature,
-		"homepage_skin": homepageSkin,
+		"nickname":            nickname,
+		"gender":              gender,
+		"signature":           signature,
+		"avatar":              avatar,
+		"homepage_skin":       homepageSkin,
+		"avatar_accessory":    avatarAccessory,
+		"title_badge":         titleBadge,
+		"homepage_background": homepageBackground,
+		"homepage_layout":     homepageLayout,
 	}
 	result := r.db.Model(&model.User{}).Where("id = ?", userID).Updates(updates)
 	if result.Error != nil {
 		return nil, result.Error
-	}
-	if result.RowsAffected == 0 {
-		return nil, ErrUserNotFound
 	}
 	return r.FindByID(userID)
 }
@@ -77,9 +79,6 @@ func (r *GormUserRepository) UpdatePublicKey(userID uint64, publicKey string, al
 	result := r.db.Model(&model.User{}).Where("id = ?", userID).Updates(updates)
 	if result.Error != nil {
 		return nil, result.Error
-	}
-	if result.RowsAffected == 0 {
-		return nil, ErrUserNotFound
 	}
 	return r.FindByID(userID)
 }
